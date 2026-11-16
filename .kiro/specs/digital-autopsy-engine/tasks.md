@@ -273,26 +273,26 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - For all record texts the hash provider returns identical 384 finite `float32` vectors in the current and in a fresh process, with L2 norm 1 (or zero for empty text); the API provider (stubbed with `respx`) is rejected for wrong dimension, NaN or inf, HTTP errors and timeouts with the matching `EmbeddingError` reason; the vector-reuse part (one embedding call per record, same arrays reach `index_session`) is added in task 21.5
     - **Validates: Requirements 6.20, 6.21, 6.22, 14.1**
 
-- [ ] 18. Code generation and persistence services
-  - [ ] 18.1 Implement `services/codegen.py`
+- [x] 18. Code generation and persistence services
+  - [x] 18.1 Implement `services/codegen.py`
     - Jinja2 template; `safe_identifier()` (non-identifier chars to `_`, `f_` prefix for leading digit, `_` suffix for keywords and `BaseModel` attributes, numeric de-duplication); one Pydantic v2 model and one `APIRouter` with exactly five endpoints per entity over an in-memory dict; type-mapped `Annotated[..., Field(max_length/max_digits/pattern)]` plus `json_schema_extra={"legacy_length": n}`; one `# {anomaly} ({severity})` comment per anomaly above its field; `ast.parse` syntax check returning line, offset and message; never executes the source; zero entities yields only `app = FastAPI()`
     - _Requirements: 9.3, 9.4, 9.5, 9.6, 9.7, 17.14_
-  - [ ] 18.2 Write property test for generated code
+  - [x] 18.2 Write property test for generated code
     - **Property 13: Generated code compiles**
     - Entity and field names with quotes, newlines, keywords, leading digits, duplicates and Unicode: `ast.parse` passes, exactly one model and one router with five route decorators per entity, `legacy_length` equals the inferred length, one comment per anomaly, verified by AST walk without importing
     - **Validates: Requirements 9.3, 9.4, 9.5, 9.6, 9.7, 17.14**
-  - [ ] 18.3 Implement `services/cache.py`
+  - [x] 18.3 Implement `services/cache.py`
     - Key `necro:result:{sha256}` (single file: raw bytes hashed before decode; data plus copybook: length-prefixed hash); value `gzip(json({"v": 1, "input_kind", "events"}))`; the only `SET` call site uses `EX ttl`; `redis.asyncio` with 2 s timeouts; get failures treated as a miss with one warning, set failures log a warning; nothing stored for failed or cancelled sessions
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.8, 15.9_
-  - [ ] 18.4 Write property test for the cache round trip
+  - [x] 18.4 Write property test for the cache round trip
     - **Property 10: Cache round trip**
     - `decode(encode(x)) == x`, `fakeredis` set/get preserves events in order with original types and payloads, every key has a TTL in [60, 604800], invalid TTL settings fall back to 86,400, key equality tracks byte equality
     - **Validates: Requirements 15.1, 15.4, 15.5, 15.7, 15.8**
-  - [ ] 18.5 Implement `services/vector_store.py`
+  - [x] 18.5 Implement `services/vector_store.py`
     - `ensure_schema()` (extension, `record_embeddings` table, session btree index, RLS), `AsyncConnectionPool(min_size=1, max_size=5, timeout=3)` with `prepare_threshold=None`, `index_session(records, embeddings)` that stores the vectors computed by `ml_rot_scorer` as they are and embeds only records without a vector, once, through the `EmbeddingProvider` of task 17.4 (batches of 256 on a worker thread, 120 s deadline checked between batches), no second embedding pass, upserts in batches of 1,000 with bound parameters, `empty_fields` and `anomaly_flags`, hourly purge task
     - `search`: query embedded with the provider recorded for the session's index (same provider and configuration as indexing), missing-field intent regex and field-token matching adding `empty_fields @> %s`, cosine query with bound parameters, `LIMIT 100`, similarity clamped to [0, 1] and `SEARCH_MIN_SIMILARITY` of 0.35, `asyncio.timeout(4.5)` with `statement_timeout=4000ms`; `index_key` always comes from the session store
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8, 14.9, 14.13, 6.23, 17.13_
-  - [ ] 18.6 Write property test for search isolation
+  - [x] 18.6 Write property test for search isolation
     - **Property 14: Search session isolation**
     - With multiple sessions in one table (pgvector test container or a faithful in-memory fake store) and SQL metacharacter queries: every hit belongs to the requesting session key, missing-field queries return no hit with a non-empty matched field, at most 100 hits in non-increasing similarity, invalid lengths rejected with no hits; with the hash provider the query and index vectors come from the same provider, and `index_session` given precomputed vectors makes zero embedding calls for them
     - **Validates: Requirements 14.1, 14.3, 14.5, 14.6, 14.8, 14.11, 14.13, 17.13**
