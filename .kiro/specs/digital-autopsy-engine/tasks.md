@@ -136,7 +136,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Cover empty and over-length query rejection, no-match message, announcement, download content equals source
     - _Requirements: 14.7, 14.10, 14.11, 9.10_
 
-- [ ] 9. Workbench assembly and web test suites
+- [x] 9. Workbench assembly and web test suites
   - [x] 9.1 Assemble `AutopsyWorkbench.tsx` and `page.tsx`
     - Client container owning the reducer: wires Dropzone, client subscription (with reconnect and "connection lost" message keeping progress), ProgressRail, canvas, EntityList, summary, announcer, inspector, X-Ray (image input only), search panel and code view; announces result changes within 1 s
     - Shows the cache-served indicator and the uploaded image for image sessions
@@ -144,7 +144,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
   - [x] 9.2 Write Playwright e2e tests against the mock
     - Cover keyboard-only flow, preset to results, X-Ray toggle, drawer, WebGL-disabled mode, zoom at 100/150/200% with `scrollWidth <= clientWidth`, and `@axe-core/playwright` with zero violations on empty, loaded text, loaded image with X-Ray on, open drawer and WebGL-unavailable states
     - _Requirements: 18.1, 18.2, 18.9, 11.11, 12.4, 18.8_
-  - [ ] 9.3 Write a Playwright rendering test for 5,000 points and 10,000 boxes
+  - [x] 9.3 Write a Playwright rendering test for 5,000 points and 10,000 boxes
     - Assert the overlay shows within 1 s of toggling on with 10,000 boxes and record the frame rate for 50 nodes with 5,000 points
     - _Requirements: 12.13, 11.12_
 
