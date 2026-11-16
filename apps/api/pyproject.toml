@@ -31,5 +31,5 @@ root_package = "app"
 [[tool.importlinter.contracts]]
 name = "ML and embeddings never import the LLM layer"
 type = "forbidden"
-source_modules = ["app.agents.nodes.ml_rot_scorer", "app.services.ml", "app.services.embeddings"]
+source_modules = ["app.services.ml", "app.services.embeddings"]
 forbidden_modules = ["app.core.llm"]

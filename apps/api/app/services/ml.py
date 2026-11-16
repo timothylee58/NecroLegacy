@@ -85,7 +85,8 @@ def _numeric_columns(entity: MlEntity) -> tuple[list[str], np.ndarray, bool]:
 
 def _byte_variance(entity: MlEntity) -> np.ndarray:
     sizes = np.array([sum(len(v.encode("utf-8")) for v in r) for r in entity.rows], dtype=np.float64)
-    return (sizes - sizes.mean()) ** 2
+    variance: np.ndarray = (sizes - sizes.mean()) ** 2
+    return variance
 
 
 def _finish_axes(raw: np.ndarray) -> np.ndarray:
@@ -96,7 +97,8 @@ def _finish_axes(raw: np.ndarray) -> np.ndarray:
     for axis in range(3):
         peak = float(np.abs(out[:, axis]).max()) if n else 0.0
         out[:, axis] = out[:, axis] / peak if peak > AXIS_EPSILON else 0.0
-    return np.round(np.clip(out, -1.0, 1.0), 6) + 0.0
+    result: np.ndarray = np.round(np.clip(out, -1.0, 1.0), 6) + 0.0
+    return result
 
 
 def _embedding_coordinates(matrix: np.ndarray) -> np.ndarray | None:
@@ -219,7 +221,7 @@ def score_entities(
     for e in entities:
         result = _score(e)
         if isinstance(result, str):
-            outcome.skipped.append(SkippedEntity(entity=e.name, reason=result))  # type: ignore[arg-type]
+            outcome.skipped.append(SkippedEntity(entity=e.name, reason=result))
             continue
         coords: np.ndarray | None = None
         if e.name in embeddings:

@@ -102,12 +102,34 @@ def test_outlier_anomaly_names_field_and_rows():
     assert len(a.sample_rows) <= 5 and set(a.affected_rows) == set(a.outlier_scores or {})
 
 
-def test_sampling_caps_at_5000_flagged_first():
-    entity = make_entity(n=6000)
-    outcome = run(entity)
-    assert len(outcome.points) <= 5000
-    total_flagged = sum(1 for _ in outcome.anomalies[0].affected_rows)
-    assert sum(p.flagged for p in outcome.points) == min(total_flagged, 5000)
+@pytest.mark.parametrize("flagged", [0, 10, 4999, 5000, 5500])
+def test_sampling_caps_at_5000_flagged_first(flagged):
+    from app.schemas.autopsy import SpatialPoint
+    from app.services.ml import _sample
+
+    pts = [
+        (
+            SpatialPoint(
+                entity="e",
+                row_number=i + 1,
+                x=0,
+                y=0,
+                z=0,
+                flagged=i < flagged,
+                outlier_score=-0.2 - i * 1e-6 if i < flagged else 0.1,
+            ),
+            i,
+        )
+        for i in range(8000)
+    ]
+    out = _sample(pts)
+    assert len(out) <= 5000
+    assert sum(p.flagged for p in out) == min(flagged, 5000)
+    rows = [p.row_number for p in out]
+    assert len(set(rows)) == len(rows)
+    if flagged < 5000:
+        assert {p.row_number for p in out if p.flagged} == set(range(1, flagged + 1))
+        assert len(out) > flagged
 
 
 def _numeric_only(entity: MlEntity):

@@ -73,7 +73,8 @@ def _bucket(token: str) -> tuple[int, float]:
 def _l2(matrix: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     safe = np.where(norms > 0, norms, 1.0)
-    return (matrix / safe).astype(np.float32)
+    out: np.ndarray = (matrix / safe).astype(np.float32)
+    return out
 
 
 class HashEmbeddingProvider:
