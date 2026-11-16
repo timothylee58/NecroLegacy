@@ -148,7 +148,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Assert the overlay shows within 1 s of toggling on with 10,000 boxes and record the frame rate for 50 nodes with 5,000 points
     - _Requirements: 12.13, 11.12_
 
-- [ ] 10. Checkpoint - Phase 1 complete
+- [x] 10. Checkpoint - Phase 1 complete
   - Ensure all tests pass (`pnpm --filter web exec tsc --noEmit`, lint, `vitest run`), ask the user if questions arise.
 
 ### Phase 2: FastAPI service

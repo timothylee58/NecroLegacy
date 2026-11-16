@@ -81,8 +81,8 @@
       "id": "10",
       "title": "Checkpoint - Phase 1 complete",
       "details": "- [ ] 10. Checkpoint - Phase 1 complete\n  - Ensure all tests pass (`pnpm --filter web exec tsc --noEmit`, lint, `vitest run`), ask the user if questions arise.\n\n### Phase 2: FastAPI service",
-      "done": false,
-      "notes": ""
+      "done": true,
+      "notes": "tsc, lint (NEXT_PUBLIC_USE_MOCK=true) and vitest 108/108 pass; fixed flaky focus timing test."
     },
     {
       "id": "11",

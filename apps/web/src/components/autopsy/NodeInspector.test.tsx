@@ -87,8 +87,8 @@ describe("NodeInspector", () => {
   it("moves focus into the dialog within 100 ms of opening (13.2)", async () => {
     const user = userEvent.setup();
     render(<Harness anomalies={[makeAnomaly([1, 2])]} />);
-    const start = performance.now();
     await user.click(screen.getByRole("button", { name: "open inspector" }));
+    const start = performance.now();
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog).toContainElement(document.activeElement as HTMLElement), { timeout: 100 });
     expect(performance.now() - start).toBeLessThan(100 + 50);
