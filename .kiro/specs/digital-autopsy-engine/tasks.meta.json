@@ -131,6 +131,11 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794798044959
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794801591318
       }
     ],
     "2.4 Build the mock autopsy fixtures and event player": [
@@ -148,6 +153,11 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794798045018
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794801593049
       }
     ],
     "2.5 Define `AutopsyClient` and the mock implementation": [
@@ -160,6 +170,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796425541
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794802805770
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808579203
       }
     ],
     "2.6 Implement the fetch-based SSE client": [
@@ -177,6 +197,11 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794798045068
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794801591710
       }
     ],
     "2.7 Write unit tests for the SSE client": [
@@ -189,6 +214,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796425667
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794802805854
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808585081
       }
     ],
     "2.8 Implement the workbench reducer and selectors": [
@@ -201,6 +236,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796425726
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794802805983
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808585006
       }
     ],
     "2.9 Write unit tests for the reducer": [
@@ -213,6 +258,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796425766
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808763285
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811970725
       }
     ],
     "3.1 Build `DropzoneModal.tsx`": [
@@ -225,6 +280,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796425802
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808763845
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811969131
       }
     ],
     "3.2 Write component tests for the dropzone": [
@@ -237,6 +302,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796425835
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812019765
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812303519
       }
     ],
     "4.1 Implement scene helpers": [
@@ -276,6 +351,11 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794798045340
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794801592511
       }
     ],
     "4.3 Implement `AutopsyScene` class": [
@@ -293,6 +373,11 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794798045889
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794801591233
       }
     ],
     "4.4 Write unit test for scene disposal": [
@@ -305,6 +390,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426006
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794802806563
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808579280
       }
     ],
     "4.5 Implement `AutopsyCanvas.tsx`": [
@@ -317,6 +412,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426048
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808589418
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808759464
       }
     ],
     "5.1 Implement accessibility helpers": [
@@ -351,6 +456,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426128
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794802807202
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808584779
       }
     ],
     "5.3 Write unit tests for summary, announcer and contrast": [
@@ -363,6 +478,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426165
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794801598053
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794802800563
       }
     ],
     "6.1 Build `NodeInspector.tsx`": [
@@ -375,6 +500,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426193
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808764359
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811968609
       }
     ],
     "6.2 Write component tests for the inspector": [
@@ -387,6 +522,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426231
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812020323
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812303627
       }
     ],
     "7.1 Build `VisionXRayOverlay.tsx`": [
@@ -399,6 +544,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426265
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808765208
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811971564
       }
     ],
     "7.2 Write component tests for the overlay": [
@@ -411,6 +566,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426310
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812021104
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812303960
       }
     ],
     "8.1 Build `SearchPanel.tsx`": [
@@ -423,6 +588,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426348
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808765769
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811969921
       }
     ],
     "8.2 Build `GeneratedCodeView.tsx`": [
@@ -435,6 +610,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426382
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811981103
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812011374
       }
     ],
     "8.3 Write component tests for search and code view": [
@@ -447,6 +632,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426420
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812021895
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812304773
       }
     ],
     "9.1 Assemble `AutopsyWorkbench.tsx` and `page.tsx`": [
@@ -459,6 +654,16 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426458
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812022652
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812305589
       }
     ],
     "9.2 Write Playwright e2e tests against the mock": [
@@ -471,6 +676,11 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794796426495
+      },
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812309238
       }
     ],
     "9.3 Write a Playwright rendering test for 5,000 points and 10,000 boxes": [
@@ -1282,6 +1492,55 @@
         "executionId": "280e7f81-2321-4501-9714-657cbd838771",
         "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
         "timestamp": 1794797777352
+      }
+    ],
+    "5. Entity list, summary, announcer and progress": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808584845
+      }
+    ],
+    "4. Autopsy_Table 3D scene": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794808759512
+      }
+    ],
+    "2. Web types, mock data and client abstraction": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794811970771
+      }
+    ],
+    "3. Necro_Dropzone": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812303572
+      }
+    ],
+    "6. Node_Inspector_Drawer": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812303701
+      }
+    ],
+    "7. Vision X-Ray overlay": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812304004
+      }
+    ],
+    "8. Search panel and generated code view": [
+      {
+        "executionId": "280e7f81-2321-4501-9714-657cbd838771",
+        "chatSessionId": "sess_fc6167e5-94de-46f5-bbd7-88a7ffdfbf00",
+        "timestamp": 1794812304811
       }
     ]
   }

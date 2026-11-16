@@ -27,7 +27,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Add `tsc --noEmit`, lint and `vitest run` scripts
     - _Requirements: 19.1, 17.8, 17.9, 18.2_
 
-- [ ] 2. Web types, mock data and client abstraction
+- [x] 2. Web types, mock data and client abstraction
   - [x] 2.1 Define the wire types
     - Create `apps/web/src/types/autopsy.ts` with every type from the design's TypeScript section (`NodeName`, `Severity`, `BoundingBox`, `VisionCell`, `VisionDefect`, `VisionResult`, `SchemaField`, `Entity`, `Anomaly`, `SpatialPoint`, `SessionEvent` union, `SchemaPayload`, `MlResult`, `RotResult`, `ResurrectionResult`, `SearchResponse`, `CreateSessionResponse`, `ErrorResponse`, `PresetId`)
     - Keys are snake_case to match the API wire format
@@ -36,112 +36,112 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Create `src/lib/file-validation.ts` exporting the shared limits (text 5,242,880, image 10,485,760), a case-insensitive extension check for the seven extensions, a `>` size comparison so the exact limit passes, and an image signature check reading the first 8 bytes with `file.slice(0, 8).arrayBuffer()`
     - Return typed rejection reasons that carry the alert text (seven extensions, 5 MB limit, 10 MB image limit)
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.8_
-  - [-] 2.3 Write unit tests for file validation
+  - [x] 2.3 Write unit tests for file validation
     - Cover extensions in mixed case, exact-limit and limit+1 sizes for text and image, PNG/JPEG signature mismatches
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.8_
-  - [-] 2.4 Build the mock autopsy fixtures and event player
+  - [x] 2.4 Build the mock autopsy fixtures and event player
     - Create `src/lib/mock-autopsy.ts` with fixtures: ledger preset (3 entities: one critical orphan FK, one `statistical_outlier`, one clean; 600 points per entity including a flagged and an unflagged cluster), a text-input event script (first event `vision_extractor` skipped `text_input`), and an image fixture (5 rows by 4 columns, one `smudged_digit`, one `torn_total`, one `misaligned_column`, SVG data-URI image generated from the same boxes)
     - Provide a timed generator that emits `started` and `completed` events per node ending with a `terminal` event, plus a rot_detector failure variant and a skipped-ML variant
     - _Requirements: 11.13, 12.12, 10.2, 10.5, 6.8, 19.8_
-  - [~] 2.5 Define `AutopsyClient` and the mock implementation
+  - [x] 2.5 Define `AutopsyClient` and the mock implementation
     - Create `src/lib/api-client.ts` with the `AutopsyClient`, `SessionInput`, `SessionHandlers` interfaces and `createClient()` returning the mock client when `NEXT_PUBLIC_USE_MOCK === "true"`
     - Implement `MockClient` (createSession, subscribe with `lastEventId` replay, search over fixtures, getAnomalies with severity and entity filters, presetImageUrl)
     - _Requirements: 19.8, 19.9, 16.2, 14.3_
-  - [-] 2.6 Implement the fetch-based SSE client
+  - [x] 2.6 Implement the fetch-based SSE client
     - Create `src/lib/sse-client.ts` with `openSessionStream(url, lastEventId, handlers)` using `fetch` + `ReadableStream`, an `id:`/`event:`/`data:` frame parser tolerant of arbitrary chunk splits, `Last-Event-ID` header, duplicate suppression by highest seen ID, retries at 1, 2, 4, 8, 16 s, attempt counter reset on success, `onConnectionLost()` after the fifth failed attempt, and no retry after a `terminal` event
     - _Requirements: 10.7, 10.9_
-  - [~] 2.7 Write unit tests for the SSE client
+  - [x] 2.7 Write unit tests for the SSE client
     - Use fake timers to assert delays 1, 2, 4, 8, 16 s, resume from the last ID, stop after 5 failures and no duplicate delivery
     - _Requirements: 10.7, 10.8, 10.9_
-  - [~] 2.8 Implement the workbench reducer and selectors
+  - [x] 2.8 Implement the workbench reducer and selectors
     - Create `src/lib/session-reducer.ts`: pure reducer over `SessionEvent | UiAction` with the state fields from the design (`phase`, `nodeStatus`, `currentNode`, `vision`, `schema`, `ml`, `rot`, `resurrection`, `selectedEntityId`, `searchHits`, `connection`, `servedFromCache`, `inputKind`)
     - Add selectors `entitySeverity`, `anomaliesByEntity`, `flaggedRegions`, and the mapper from API types to `SceneGraph`
     - A failed node preserves earlier results and a rot_detector failure leaves `api_resurrector` skipped
     - _Requirements: 10.2, 10.3, 10.4, 10.11, 9.9, 11.7_
-  - [~] 2.9 Write unit tests for the reducer
+  - [x] 2.9 Write unit tests for the reducer
     - Cover vision skipped first for text, failure preserving earlier results, ML skipped, cache indicator
     - _Requirements: 10.5, 10.11, 6.8, 15.5_
 
-- [ ] 3. Necro_Dropzone
-  - [~] 3.1 Build `DropzoneModal.tsx`
+- [x] 3. Necro_Dropzone
+  - [x] 3.1 Build `DropzoneModal.tsx`
     - shadcn `Dialog` with a drop target (`role="button"`, `tabIndex=0`, Enter/Space opens the file input with `accept=".dat,.txt,.csv,.cpy,.png,.jpg,.jpeg"` and `multiple`) and exactly three Presets as a `role="radiogroup"` with roving tabindex (Arrow keys move, Enter/Space selects and submits)
     - Rejections render a `role="alert"` and keep the previous session and an enabled picker; pairing rule: one `.cpy` plus one data file are sent together, a lone `.cpy` is a layout-only session, two non-`.cpy` files are rejected
     - Upload uses `AbortSignal.timeout(10_000)`; timeout or network error shows a `role="alert"` with a Retry button and creates no session
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.9, 1.10, 1.13_
-  - [~] 3.2 Write component tests for the dropzone
+  - [x] 3.2 Write component tests for the dropzone
     - Cover alerts for bad extension and oversize, dispatch within 500 ms, keyboard-only preset selection, retry after timeout
     - _Requirements: 1.2, 1.4, 1.9, 1.10, 1.13_
 
-- [ ] 4. Autopsy_Table 3D scene
+- [x] 4. Autopsy_Table 3D scene
   - [x] 4.1 Implement scene helpers
     - Create `src/lib/scene/layout.ts` (seeded `mulberry32(hash(entityNames))` force layout, 200 iterations, sphere radius 6), `palette.ts` (crimson `#DC143C`, slate `#94A3B8`), and `webgl.ts` (throwaway-canvas probe for `webgl2` then `webgl`)
     - _Requirements: 11.1, 11.5, 11.7, 11.11_
-  - [-] 4.2 Write unit tests for layout determinism
+  - [x] 4.2 Write unit tests for layout determinism
     - Same entity names give identical positions; points equal node position plus a constant scale times coordinates
     - _Requirements: 11.5, 11.7_
-  - [-] 4.3 Implement `AutopsyScene` class
+  - [x] 4.3 Implement `AutopsyScene` class
     - Create `src/lib/scene/AutopsyScene.ts` (no React imports) with `setGraph`, `setHighlights`, `setReducedMotion`, `resize`, `dispose`
     - Node spheres with a pulse of one cycle per 2 s for entities without Anomalies, crimson nodes and animated shader arcs on edges touching critical Anomalies, one `THREE.Points` per entity (flagged crimson, others slate) at `nodePosition + 1.5 * (x, y, z)`, raycaster picking calling `onSelect`
     - Reduced-motion mode: no pulse or moving arc; teal halo ring for healthy, crimson fill plus solid thick arc and diamond marker for critical; render on demand
     - RAF only while visible and intersecting; `dispose()` cancels RAF, removes observers and listeners, disposes geometries, materials and textures, calls `renderer.dispose()` and `forceContextLoss()`; pixel ratio capped at 2
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.10, 11.12_
-  - [~] 4.4 Write unit test for scene disposal
+  - [x] 4.4 Write unit test for scene disposal
     - Stub `WebGLRenderer` and assert every created geometry and material has `dispose` called exactly once across repeated `setGraph` calls and `dispose()`
     - _Requirements: 11.12_
-  - [~] 4.5 Implement `AutopsyCanvas.tsx`
+  - [x] 4.5 Implement `AutopsyCanvas.tsx`
     - Thin React shell loaded with `next/dynamic({ ssr: false })`; creates the scene in `useEffect` and disposes on cleanup (Strict-Mode safe); canvas has `role="img"` and `aria-describedby` for the summary; renders an empty-state message when there are zero entities; on no WebGL or `webglcontextlost` shows the Entity_List and the message "3D rendering is unavailable" without mounting a canvas; reacts live to `prefers-reduced-motion` changes
     - _Requirements: 11.11, 11.14, 11.10, 18.8_
 
-- [ ] 5. Entity list, summary, announcer and progress
+- [x] 5. Entity list, summary, announcer and progress
   - [x] 5.1 Implement accessibility helpers
     - Create `src/lib/a11y/summary.ts` (per-entity name, counts of low/medium/critical including zeros, related entity names; announcement helper capped at 250 characters) and `src/lib/a11y/contrast.ts` (WCAG ratio helper)
     - _Requirements: 18.3, 18.4, 18.7_
-  - [~] 5.2 Build `EntityList`, `AutopsySummary`, `LiveAnnouncer`, `ProgressRail`
+  - [x] 5.2 Build `EntityList`, `AutopsySummary`, `LiveAnnouncer`, `ProgressRail`
     - `EntityList` items are `<button>`s named `"{name}, {highest severity | no anomalies}"`, activated with Enter/Space to open the inspector
     - `AutopsySummary` always in the DOM; `LiveAnnouncer` context with one `aria-live="polite"` region; `ProgressRail` shows the five nodes with the current node name in its own `aria-live="polite"` region updated on each `started` event
     - Severity shown as icon plus text label (`ShieldAlert`/Critical, `TriangleAlert`/Medium, `Info`/Low)
     - _Requirements: 11.9, 18.3, 18.4, 18.5, 18.6, 10.10_
-  - [~] 5.3 Write unit tests for summary, announcer and contrast
+  - [x] 5.3 Write unit tests for summary, announcer and contrast
     - Cover zero counts, 250 character cap, accessible names, palette tokens meeting 4.5:1 (3:1 for large text) and focus color meeting 3:1
     - _Requirements: 18.2, 18.3, 18.4, 18.5, 18.7_
 
-- [ ] 6. Node_Inspector_Drawer
-  - [~] 6.1 Build `NodeInspector.tsx`
+- [x] 6. Node_Inspector_Drawer
+  - [x] 6.1 Build `NodeInspector.tsx`
     - shadcn `Sheet` (Radix Dialog) with title "Entity: {name}", a description element, focus to the close button on open, Escape closes and returns focus to the opener or the canvas wrapper `returnFocusRef`
     - Edit `components/ui/sheet.tsx` to animate with Framer Motion at 0.25 s and 0 s when `useReducedMotion()`
     - Show fields, at most 5 sample rows with "N corrupted rows in total", per-anomaly cards (icon plus label, confidence to two decimals, root cause), and "No anomalies were detected for this entity." when empty
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 11.8_
-  - [~] 6.2 Write component tests for the inspector
+  - [x] 6.2 Write component tests for the inspector
     - Cover focus within 100 ms, Tab cycling, Escape focus return, dialog name and description, 5-sample cap, empty-anomaly message, reduced-motion duration
     - _Requirements: 13.2, 13.3, 13.4, 13.5, 13.7, 13.8_
 
-- [ ] 7. Vision X-Ray overlay
-  - [~] 7.1 Build `VisionXRayOverlay.tsx`
+- [x] 7. Vision X-Ray overlay
+  - [x] 7.1 Build `VisionXRayOverlay.tsx`
     - Props `{ imageUrl, imageWidth, imageHeight, cells, defects, onAnnounce }`; shown only for image input; shadcn `Toggle` "Vision X-Ray" with `aria-pressed`, off by default; `aria-disabled="true"` plus a reason message when the image fails to load or there are no boxes
     - SVG with `viewBox="0 0 W H"` absolutely positioned over a `width:100%; height:auto` image; per cell a halo rect and a main rect (2 px, `vector-effect="non-scaling-stroke"`), green `#15803D` solid for confident cells, crimson dashed for confidence < 0.6 or any defect, `fill-opacity = round(0.1 + 0.5 * (1 - confidence), 2)`, text tags for flagged cells (cap 200), memoized rect group
     - Opacity legend, hover/focus tooltip (text, confidence to two decimals, defect type), flagged-region `<ul>` of focusable items whose Enter/Space highlights the rect, "No defects were detected." when empty, SVG `role="img"` with `aria-labelledby` the list heading, announcement "Vision X-Ray on. N flagged regions." from the toggle handler, no transition under reduced motion else 150 ms fade
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10, 12.11, 12.12, 12.13, 18.1, 18.10, 18.11, 18.12, 18.13_
-  - [~] 7.2 Write component tests for the overlay
+  - [x] 7.2 Write component tests for the overlay
     - Cover opacity formula, 0.6 boundary not flagged, list contents and ordering, disabled states, toggle `aria-pressed`, keyboard activation, announcement text
     - _Requirements: 12.2, 12.5, 12.6, 12.8, 12.9, 12.11, 18.10, 18.12_
 
-- [ ] 8. Search panel and generated code view
-  - [~] 8.1 Build `SearchPanel.tsx`
+- [x] 8. Search panel and generated code view
+  - [x] 8.1 Build `SearchPanel.tsx`
     - Query input with 1–500 character validation, results list via `client.search`, "no records matched" message, result count announced in the polite region, hits dispatched to the reducer so the scene highlights the nodes
     - _Requirements: 14.3, 14.7, 14.10, 14.11_
-  - [~] 8.2 Build `GeneratedCodeView.tsx`
+  - [x] 8.2 Build `GeneratedCodeView.tsx`
     - Read-only code view of `resurrection.source` shown only when the syntax check passed, a download action saving the complete source as a single `.py` file, and the syntax error location display when it failed (source still shown)
     - _Requirements: 9.8, 9.10_
-  - [~] 8.3 Write component tests for search and code view
+  - [x] 8.3 Write component tests for search and code view
     - Cover empty and over-length query rejection, no-match message, announcement, download content equals source
     - _Requirements: 14.7, 14.10, 14.11, 9.10_
 
 - [ ] 9. Workbench assembly and web test suites
-  - [~] 9.1 Assemble `AutopsyWorkbench.tsx` and `page.tsx`
+  - [x] 9.1 Assemble `AutopsyWorkbench.tsx` and `page.tsx`
     - Client container owning the reducer: wires Dropzone, client subscription (with reconnect and "connection lost" message keeping progress), ProgressRail, canvas, EntityList, summary, announcer, inspector, X-Ray (image input only), search panel and code view; announces result changes within 1 s
     - Shows the cache-served indicator and the uploaded image for image sessions
     - _Requirements: 1.9, 10.9, 10.10, 12.1, 15.5, 18.4, 19.8_
-  - [~] 9.2 Write Playwright e2e tests against the mock
+  - [-] 9.2 Write Playwright e2e tests against the mock
     - Cover keyboard-only flow, preset to results, X-Ray toggle, drawer, WebGL-disabled mode, zoom at 100/150/200% with `scrollWidth <= clientWidth`, and `@axe-core/playwright` with zero violations on empty, loaded text, loaded image with X-Ray on, open drawer and WebGL-unavailable states
     - _Requirements: 18.1, 18.2, 18.9, 11.11, 12.4, 18.8_
   - [~] 9.3 Write a Playwright rendering test for 5,000 points and 10,000 boxes
