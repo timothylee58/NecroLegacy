@@ -199,15 +199,15 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Output has no `Cc` except `\n`/`\t`, length within `max_len`, no `<<<`, the end delimiter appears exactly once and last, instruction-like text without controls or `<<<` is unchanged, `sanitize_cell` truncates to 1,000
     - **Validates: Requirements 4.10, 17.1, 17.2, 17.3, 17.4**
 
-- [ ] 13. Legacy parser
-  - [ ] 13.1 Implement `parser.py`
+- [x] 13. Legacy parser
+  - [x] 13.1 Implement `parser.py`
     - `Layout`, `ParseResult`, `parse(data, hints=None)` and `print_records(records, layout)`: encoding detection (ascii, utf-8, EBCDIC share with 0.5 threshold, cp037 decode with U+FFFD, uncertain flag), line delimiter detection (LF/CRLF/CR/FIXED with record-length search), CSV delimiter and header detection, fixed-width boundaries (at most 100, ascending byte offsets), per-record failures recorded as `(line, reason)` and excluded, preview of the first 50 records, right-trim only, RFC 4180 quoting, `cp037` output for EBCDIC
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.10_
-  - [ ] 13.2 Write property test for the legacy record round trip
+  - [x] 13.2 Write property test for the legacy record round trip
     - **Property 1: Legacy record round trip**
     - `parse(print_records(R, L), hints=L)` yields `R` for LF, CRLF, CR, FIXED and the four CSV delimiters, in ASCII, UTF-8 and cp037
     - **Validates: Requirements 2.1, 2.5, 2.6, 2.8, 2.9**
-  - [ ] 13.3 Write property test for parser determinism and bounds
+  - [x] 13.3 Write property test for parser determinism and bounds
     - **Property 2: Parser determinism and bounds**
     - Equal results on identical bytes, confidence in [0, 1], strictly ascending boundaries with at most 100 entries, preview of `min(50, n)` records, failed records excluded and reported with 1-based lines
     - **Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.7, 2.10**
