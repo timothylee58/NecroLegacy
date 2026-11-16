@@ -20,7 +20,7 @@ def non_terminal_events(draw):
     if kind == "fallback":
         return (
             "fallback",
-            {"failed_provider": "ilmu", "reason": draw(st.sampled_from(["error", "timeout", "validation"]))},
+            {"failed_provider": "primary", "reason": draw(st.sampled_from(["error", "timeout", "validation"]))},
             None,
             None,
         )

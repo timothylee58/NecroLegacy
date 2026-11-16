@@ -38,7 +38,7 @@ class VisionTable(BaseModel):
 
 
 def table_model_for(width: int, height: int) -> type[VisionTable]:
-    """A box outside the sent image is a validation failure so the router falls through to Claude."""
+    """A box outside the sent image is a validation failure so the router falls through to the fallback model."""
 
     class BoundedVisionTable(VisionTable):
         @model_validator(mode="after")
@@ -107,7 +107,7 @@ async def extract_with_llm(router: LLMRouter, gray: np.ndarray, events: EventSin
                 )
             )
     cells, defects = build_from_boxes(boxes, width, height)
-    engine: Literal["ilmu", "claude"] = result.provider
+    engine: Literal["primary", "fallback"] = result.provider
     return VisionResult(
         image_width=width,
         image_height=height,

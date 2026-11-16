@@ -23,7 +23,7 @@ async def test_append_after_terminal_rejected():
     log = EventLog()
     await log.append("terminal", {"status": "completed"})
     with pytest.raises(RuntimeError):
-        await log.append("fallback", {"failed_provider": "ilmu", "reason": "error"})
+        await log.append("fallback", {"failed_provider": "primary", "reason": "error"})
 
 
 async def test_subscribe_replays_then_waits_for_new_events():

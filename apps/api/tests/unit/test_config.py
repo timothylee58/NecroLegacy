@@ -22,7 +22,10 @@ def test_defaults(env):
         10_000,
         2,
     )
-    assert s.ilmu_api_key is None
+    assert s.llm_provider == "bedrock" and s.llm_api_key is None
+    assert s.llm_primary_model == "openai.gpt-oss-120b-1:0" and not s.llm_primary_vision
+    assert s.llm_fallback_model is not None and "anthropic.claude" in s.llm_fallback_model
+    assert s.llm_fallback_vision
 
 
 def test_invalid_ocr_engine_warns_once_and_defaults(env, caplog):
@@ -55,5 +58,17 @@ def test_sanitizer_and_sessions_ranges(env):
 
 
 def test_secrets_are_not_in_repr(env):
-    env.setenv("ILMU_API_KEY", "super-secret-key")
+    env.setenv("LLM_API_KEY", "super-secret-key")
     assert "super-secret-key" not in repr(load_settings())
+
+
+def test_invalid_llm_provider_warns_and_defaults(env, caplog):
+    env.setenv("LLM_PROVIDER", "ilmu")
+    with caplog.at_level(logging.WARNING, logger="necro.config"):
+        assert load_settings().llm_provider == "bedrock"
+    assert any("LLM_PROVIDER" in r.getMessage() for r in caplog.records)
+
+
+def test_blank_model_disables_that_model(env):
+    env.setenv("LLM_PRIMARY_MODEL", "  ")
+    assert load_settings().llm_primary_model is None

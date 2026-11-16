@@ -17,6 +17,8 @@ export type FieldRole =
   | "branch_code"
   | "other";
 export type DefectType = "smudged_digit" | "torn_total" | "misaligned_column";
+/** Router role, not a vendor: the configured primary model or its fallback. */
+export type LlmProvider = "primary" | "fallback";
 export type PresetId = "ledger_1994" | "fnb_pos_corrupted" | "dotmatrix_manifest";
 export type AnomalyName =
   | "orphan_foreign_key"
@@ -56,7 +58,7 @@ export interface VisionResult {
   image_width: number;
   image_height: number;
   skew_angle_degrees: number;
-  engine: "paddleocr" | "tesseract" | "ilmu" | "claude";
+  engine: "paddleocr" | "tesseract" | "primary" | "fallback";
   cells: VisionCell[];
   defects: VisionDefect[];
 }
@@ -96,7 +98,7 @@ export interface Entity {
 export interface SchemaResult {
   entities: Entity[];
   copybook_used: boolean;
-  llm_provider?: "ilmu" | "claude" | null;
+  llm_provider?: LlmProvider | null;
 }
 
 export interface ParseError {
@@ -138,7 +140,7 @@ export interface Anomaly {
   root_cause: string;
   source: "deterministic" | "ml" | "llm";
   outlier_scores?: Record<number, number> | null;
-  llm_provider?: "ilmu" | "claude" | null;
+  llm_provider?: LlmProvider | null;
 }
 
 export interface SpatialPoint {
@@ -198,7 +200,7 @@ export type SessionEvent =
   | { id: number; type: "node"; node: NodeName; state: "started"; payload: Record<string, never> }
   | { id: number; type: "node"; node: NodeName; state: "skipped"; payload: { reason: string } }
   | { id: number; type: "node"; node: NodeName; state: "failed"; payload: { code: string; message: string } }
-  | { id: number; type: "fallback"; payload: { failed_provider: "ilmu"; reason: "error" | "timeout" | "validation" } }
+  | { id: number; type: "fallback"; payload: { failed_provider: "primary"; reason: "error" | "timeout" | "validation" } }
   | { id: number; type: "error"; payload: { node: NodeName; code: string; message: string } }
   | { id: number; type: "terminal"; payload: { status: "completed" | "failed"; failed_node?: NodeName } };
 

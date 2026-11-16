@@ -173,7 +173,7 @@ export const FNB_ML_ANOMALIES: Anomaly[] = [
 export const FNB_SCHEMA: SchemaPayload = {
   entities: FNB_ENTITIES,
   copybook_used: false,
-  llm_provider: "ilmu",
+  llm_provider: "primary",
   raw_preview: null,
 };
 

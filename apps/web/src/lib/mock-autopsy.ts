@@ -172,7 +172,7 @@ export const LEDGER_ANOMALIES = {
 export const LEDGER_SCHEMA: SchemaPayload = {
   entities: LEDGER_ENTITIES,
   copybook_used: false,
-  llm_provider: "ilmu",
+  llm_provider: "primary",
   raw_preview: null,
 };
 

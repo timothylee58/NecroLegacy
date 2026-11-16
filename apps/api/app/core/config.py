@@ -32,11 +32,15 @@ class Settings(BaseSettings):
     redis_url: SecretStr
     supabase_db_url: SecretStr
 
-    ilmu_api_key: SecretStr | None = None
-    ilmu_base_url: str | None = None
-    ilmu_model: str | None = None
-    anthropic_api_key: SecretStr | None = None
-    anthropic_model: str = "claude-sonnet-4-5"
+    # Bedrock credentials come from the standard AWS chain (env, profile, role), never from Settings.
+    llm_provider: Literal["bedrock", "openai_compatible"] = "bedrock"
+    aws_region: str | None = None
+    llm_primary_model: str | None = "openai.gpt-oss-120b-1:0"
+    llm_primary_vision: bool = False
+    llm_fallback_model: str | None = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    llm_fallback_vision: bool = True
+    llm_base_url: str | None = None
+    llm_api_key: SecretStr | None = None
 
     ocr_engine: Literal["paddleocr", "tesseract"] = "paddleocr"
     embedding_provider: Literal["hash", "api"] = "hash"
@@ -50,10 +54,24 @@ class Settings(BaseSettings):
     api_token: SecretStr | None = None
     log_level: str = "INFO"
 
-    @field_validator("ilmu_api_key", "anthropic_api_key", "embedding_api_key", "api_token", mode="before")
+    @field_validator("llm_api_key", "embedding_api_key", "api_token", mode="before")
     @classmethod
     def _blank_secret_is_unset(cls, v: Any) -> Any:
         return None if isinstance(v, str) and not v.strip() else v
+
+    @field_validator("aws_region", "llm_primary_model", "llm_fallback_model", "llm_base_url", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, v: Any) -> Any:
+        return None if isinstance(v, str) and not v.strip() else v
+
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def _llm_provider(cls, v: Any) -> Any:
+        if v in ("bedrock", "openai_compatible"):
+            return v
+        if v not in (None, ""):
+            logger.warning("LLM_PROVIDER is invalid (expected bedrock or openai_compatible); using bedrock")
+        return "bedrock"
 
     @field_validator("ocr_engine", mode="before")
     @classmethod

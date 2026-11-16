@@ -73,7 +73,7 @@ class VisionResult(Wire):
     image_width: int
     image_height: int
     skew_angle_degrees: float
-    engine: Literal["paddleocr", "tesseract", "ilmu", "claude"]
+    engine: Literal["paddleocr", "tesseract", "primary", "fallback"]
     cells: list[VisionCell]
     defects: list[VisionDefect]
 
@@ -118,7 +118,7 @@ class Entity(Wire):
 class SchemaResult(Wire):
     entities: list[Entity]
     copybook_used: bool
-    llm_provider: Literal["ilmu", "claude"] | None = None
+    llm_provider: Literal["primary", "fallback"] | None = None
 
 
 class ParseError(Wire):
@@ -160,7 +160,7 @@ class Anomaly(Wire):
     root_cause: str = Field(min_length=1)
     source: Literal["deterministic", "ml", "llm"]
     outlier_scores: dict[int, float] | None = None
-    llm_provider: Literal["ilmu", "claude"] | None = None
+    llm_provider: Literal["primary", "fallback"] | None = None
 
 
 class SpatialPoint(Wire):
@@ -235,7 +235,7 @@ class StartedPayload(Wire):
 
 
 class FallbackPayload(Wire):
-    failed_provider: Literal["ilmu"]
+    failed_provider: Literal["primary"]
     reason: Literal["error", "timeout", "validation"]
 
 
