@@ -182,19 +182,19 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Include reconnect points `k` in `[0, n]`, concurrent appends during replay, and the web `sse-client` parsing arbitrary chunk splits of the same byte stream (a fast-check test in `apps/web/src/lib/sse-client.property.test.ts`)
     - **Validates: Requirements 10.2, 10.4, 10.8, 15.5**
 
-- [ ] 12. Upload checks and sanitizer
-  - [ ] 12.1 Implement `file_checks.py`
+- [x] 12. Upload checks and sanitizer
+  - [x] 12.1 Implement `file_checks.py`
     - Streaming 64 KiB chunk read aborting past 10,485,760 bytes; case-insensitive extension allow-list; per-kind size cap (`>` rejects); executable magic bytes (ELF, MZ, Mach-O variants, `CA FE BA BE`); signature versus extension (PNG, JPEG, text must not start with either); PNG/JPEG header dimension reader for the decompression-bomb guard
     - Return typed errors mapped to `413 file_too_large`, `415 unsupported_extension`, `415 binary_executable`, `415 signature_mismatch`
     - _Requirements: 1.1, 1.2, 1.7, 1.8, 1.11, 4.3_
-  - [ ] 12.2 Write property test for the upload gate
+  - [x] 12.2 Write property test for the upload gate
     - **Property 15: Upload gate**
     - Accept iff extension allowed, size within the kind's limit (limit passes, limit+1 fails), no executable prefix, and prefix matches extension rules; rejection creates no session; frontend `file-validation.ts` and the API agree on shared cases via a shared JSON case table
     - **Validates: Requirements 1.1, 1.2, 1.5, 1.6, 1.7, 1.8, 1.11**
-  - [ ] 12.3 Implement the sanitizer
+  - [x] 12.3 Implement the sanitizer
     - `app/services/sanitizer.py`: `sanitize_value` (drop `Cc` except `\n`/`\t`, truncate to `max_len`, replace `<` runs of three or more with `‹` one for one), `wrap_data` with per-request nonce delimiters, `sanitize_cell` (controls removed, 1,000 chars)
     - _Requirements: 17.1, 17.2, 17.3, 17.4, 4.10_
-  - [ ] 12.4 Write property test for the sanitizer
+  - [x] 12.4 Write property test for the sanitizer
     - **Property 11: Sanitizer**
     - Output has no `Cc` except `\n`/`\t`, length within `max_len`, no `<<<`, the end delimiter appears exactly once and last, instruction-like text without controls or `<<<` is unchanged, `sanitize_cell` truncates to 1,000
     - **Validates: Requirements 4.10, 17.1, 17.2, 17.3, 17.4**

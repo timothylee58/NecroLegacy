@@ -1,0 +1,15 @@
+[
+  {"name": "a.dat", "size": 10, "head": "41424344", "expect": "ok"},
+  {"name": "A.CSV", "size": 5242880, "head": "41", "expect": "ok"},
+  {"name": "a.txt", "size": 5242881, "head": "41", "expect": "too_large"},
+  {"name": "a.cpy", "size": 0, "head": "", "expect": "ok"},
+  {"name": "a.exe", "size": 10, "head": "41", "expect": "unsupported_extension"},
+  {"name": "noext", "size": 10, "head": "41", "expect": "unsupported_extension"},
+  {"name": "a.png", "size": 10485760, "head": "89504e470d0a1a0a", "expect": "ok"},
+  {"name": "a.PNG", "size": 10485761, "head": "89504e470d0a1a0a", "expect": "too_large"},
+  {"name": "a.png", "size": 10, "head": "ffd8ff", "expect": "signature_mismatch"},
+  {"name": "a.jpg", "size": 10, "head": "ffd8ffe0", "expect": "ok"},
+  {"name": "a.jpeg", "size": 10, "head": "89504e470d0a1a0a", "expect": "signature_mismatch"},
+  {"name": "a.dat", "size": 10, "head": "89504e470d0a1a0a", "expect": "signature_mismatch"},
+  {"name": "a.txt", "size": 10, "head": "ffd8ff", "expect": "signature_mismatch"}
+]

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import cases from "./upload-cases.json";
 import {
   MAX_IMAGE_BYTES,
   MAX_TEXT_BYTES,
@@ -143,4 +144,20 @@ describe("signature checks (Req 1.8)", () => {
     expect(signatureMatches(".png", new Uint8Array([0x89]))).toBe(false);
     expect(signatureMatches(".txt", new Uint8Array([]))).toBe(true);
   });
+});
+
+describe("shared upload case table", () => {
+  for (const c of cases as { name: string; size: number; head: string; expect: string }[]) {
+    it(`${c.name} size=${c.size} head=${c.head || "empty"} -> ${c.expect}`, () => {
+      const head = new Uint8Array(c.head.match(/../g)?.map((h) => parseInt(h, 16)) ?? []);
+      const r = validateExtensionAndSize({ name: c.name, size: c.size });
+      let got: string;
+      if (!r.ok) {
+        got = r.reason.code.endsWith("_too_large") ? "too_large" : r.reason.code;
+      } else {
+        got = signatureMatches(r.extension, head) ? "ok" : "signature_mismatch";
+      }
+      expect(got).toBe(c.expect);
+    });
+  }
 });
