@@ -16,6 +16,7 @@ export interface AutopsyCanvasProps {
   onOpenEntity: (entityName: string, opener: HTMLButtonElement) => void;
 }
 
+const CANVAS_LABEL = "3D autopsy view of entities and their anomalies";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 function prefersReducedMotion(): boolean {
@@ -31,7 +32,9 @@ function AutopsyCanvasImpl({
   onSelect,
   onOpenEntity,
 }: AutopsyCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const summaryIdRef = useRef(summaryId);
+  summaryIdRef.current = summaryId;
   const sceneRef = useRef<AutopsyScene | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -43,12 +46,19 @@ function AutopsyCanvasImpl({
 
   useEffect(() => {
     if (!showCanvas) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const host = hostRef.current;
+    if (!host) return;
     if (!isWebGLAvailable()) {
       setUnavailable(true);
       return;
     }
+    // A disposed scene force-loses its WebGL context, so a reused canvas (Strict Mode remount) would be dead.
+    const canvas = document.createElement("canvas");
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", CANVAS_LABEL);
+    canvas.setAttribute("aria-describedby", summaryIdRef.current);
+    canvas.className = "block h-full w-full";
+    host.appendChild(canvas);
     let scene: AutopsyScene;
     try {
       scene = new AutopsyScene(canvas, {
@@ -57,6 +67,7 @@ function AutopsyCanvasImpl({
         onContextLost: () => setUnavailable(true),
       });
     } catch {
+      canvas.remove();
       setUnavailable(true);
       return;
     }
@@ -69,10 +80,14 @@ function AutopsyCanvasImpl({
     return () => {
       mql?.removeEventListener("change", onChange);
       scene.dispose();
+      canvas.remove();
       sceneRef.current = null;
     };
   }, [showCanvas]);
 
+  useEffect(() => {
+    hostRef.current?.querySelector("canvas")?.setAttribute("aria-describedby", summaryId);
+  }, [summaryId]);
   useEffect(() => {
     sceneRef.current?.setGraph(graph);
   }, [graph]);
@@ -99,15 +114,7 @@ function AutopsyCanvasImpl({
     );
   }
 
-  return (
-    <canvas
-      ref={canvasRef}
-      role="img"
-      aria-label="3D autopsy view of entities and their anomalies"
-      aria-describedby={summaryId}
-      className="h-full w-full"
-    />
-  );
+  return <div ref={hostRef} className="h-full w-full" />;
 }
 
 export const AutopsyCanvasDynamic = dynamic(() => Promise.resolve(AutopsyCanvasImpl), { ssr: false });
