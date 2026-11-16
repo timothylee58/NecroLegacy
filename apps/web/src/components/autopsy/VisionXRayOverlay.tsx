@@ -240,9 +240,9 @@ export function VisionXRayOverlay({
         <span>0.0 (opacity 0.6)</span>
       </div>
 
-      <h3 id={headingId} className="text-sm font-semibold">
+      <h2 id={headingId} className="text-sm font-semibold">
         Flagged regions ({regions.length})
-      </h3>
+      </h2>
       {regions.length === 0 ? (
         <p className="text-sm">No defects were detected.</p>
       ) : (

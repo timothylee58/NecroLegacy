@@ -31,16 +31,16 @@ export function GeneratedCodeView({
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 id={headingId} className="text-sm font-semibold">
+        <h2 id={headingId} className="text-sm font-semibold">
           Generated FastAPI wrapper
-        </h3>
+        </h2>
         <button
           type="button"
           onClick={download}
           aria-label={`Download generated code as ${filename}`}
           className="rounded border px-2 py-1 text-xs hover:bg-muted focus-visible:outline focus-visible:outline-2"
         >
-          Download .py
+          Download generated code
         </button>
       </div>
       {syntax_ok ? (

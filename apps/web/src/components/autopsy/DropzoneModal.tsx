@@ -138,7 +138,8 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
           className="rounded-md border-2 border-dashed border-border p-8 text-center"
         >
           Drop files here or press Enter to browse
-          <input
+        </div>
+        <input
             ref={inputRef}
             type="file"
             multiple
@@ -149,7 +150,6 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
             onClick={(e) => e.stopPropagation()}
             onChange={onInputChange}
           />
-        </div>
 
         <div role="radiogroup" aria-label="Sample presets" className="grid gap-2">
           {PRESETS.map((p, i) => (
