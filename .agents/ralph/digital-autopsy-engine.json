@@ -144,8 +144,8 @@
       "id": "19",
       "title": "Checkpoint - Services complete",
       "details": "- [ ] 19. Checkpoint - Services complete\n  - Ensure all tests pass (`pytest apps/api/tests/unit apps/api/tests/property`, `ruff`, `mypy`, import-linter), ask the user if questions arise.",
-      "done": false,
-      "notes": ""
+      "done": true,
+      "notes": "pytest unit+property 155 pass, ruff, mypy, import-linter clean"
     },
     {
       "id": "20",

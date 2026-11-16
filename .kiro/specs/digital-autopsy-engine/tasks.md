@@ -297,7 +297,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - With multiple sessions in one table (pgvector test container or a faithful in-memory fake store) and SQL metacharacter queries: every hit belongs to the requesting session key, missing-field queries return no hit with a non-empty matched field, at most 100 hits in non-increasing similarity, invalid lengths rejected with no hits; with the hash provider the query and index vectors come from the same provider, and `index_session` given precomputed vectors makes zero embedding calls for them
     - **Validates: Requirements 14.1, 14.3, 14.5, 14.6, 14.8, 14.11, 14.13, 17.13**
 
-- [ ] 19. Checkpoint - Services complete
+- [x] 19. Checkpoint - Services complete
   - Ensure all tests pass (`pytest apps/api/tests/unit apps/api/tests/property`, `ruff`, `mypy`, import-linter), ask the user if questions arise.
 
 - [ ] 20. LangGraph state, graph and the first three nodes
