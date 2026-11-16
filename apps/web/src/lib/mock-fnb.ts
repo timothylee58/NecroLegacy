@@ -1,0 +1,227 @@
+import type { Anomaly, Entity, MlResult, ResurrectionResult, RotResult, SchemaPayload, SpatialPoint } from "@/types/autopsy";
+import { mulberry32 } from "@/lib/scene/layout";
+
+// Synthetic F&B warehouse batch: every SKU, hub and transaction id is invented.
+
+const MAX_POINTS = 600;
+const OUTLIER_THRESHOLD = -0.15;
+
+function round(n: number, digits = 3): number {
+  const f = 10 ** digits;
+  return Math.round(n * f) / f;
+}
+
+export const FNB_ENTITIES: Entity[] = [
+  {
+    name: "INV_LEDGER_94",
+    position_unit: "column",
+    fields: [
+      { name: "txn_id", type: "string", type_confidence: 0.97, start: 0, end: 1, length: 1, role: "identifier" },
+      { name: "sku_code", type: "string", type_confidence: 0.95, start: 1, end: 2, length: 1, role: "identifier" },
+      { name: "qty_delta", type: "integer", type_confidence: 0.93, start: 2, end: 3, length: 1, role: "quantity_stock" },
+      { name: "dest_hub_id", type: "string", type_confidence: 0.9, start: 3, end: 4, length: 1, role: "branch_code" },
+    ],
+    primary_key: { field: "txn_id", confidence: 0.94 },
+    foreign_keys: [
+      { source_field: "dest_hub_id", target_entity: "MASTER_HUBS_MY", target_field: "hub_id", confidence: 0.89 },
+      { source_field: "sku_code", target_entity: "POS_PRICE_TIER", target_field: "sku_code", confidence: 0.92 },
+    ],
+    row_count: 4820,
+    record_length: null,
+  },
+  {
+    name: "MASTER_HUBS_MY",
+    position_unit: "column",
+    fields: [
+      { name: "hub_id", type: "string", type_confidence: 0.99, start: 0, end: 1, length: 1, role: "branch_code" },
+      { name: "region", type: "string", type_confidence: 0.98, start: 1, end: 2, length: 1, role: "other" },
+    ],
+    primary_key: { field: "hub_id", confidence: 0.99 },
+    foreign_keys: [],
+    row_count: 42,
+    record_length: null,
+  },
+  {
+    name: "POS_PRICE_TIER",
+    position_unit: "column",
+    fields: [
+      { name: "sku_code", type: "string", type_confidence: 0.96, start: 0, end: 1, length: 1, role: "identifier" },
+      { name: "unit_price_myr", type: "decimal", type_confidence: 0.88, start: 1, end: 2, length: 1, role: "amount" },
+    ],
+    primary_key: { field: "sku_code", confidence: 0.95 },
+    foreign_keys: [],
+    row_count: 1190,
+    record_length: null,
+  },
+];
+
+const NEGATIVE_STOCK_ROWS = [1402, 1403, 1977, 2210, 2875, 3301, 3302, 4018];
+const ORPHAN_HUB_ROWS = [1402, 1977, 2875, 3301, 4018, 4411];
+const ZERO_PRICE_ROWS = [88, 91, 214, 377, 402, 519, 640, 702, 811, 905, 1033, 1150];
+
+// Flagged rows sit in one tight cluster away from the healthy cloud so the
+// embedding-PCA separation is visible; coordinates stay within -1..1.
+function buildPoints(entity: string, rowCount: number, flaggedRows: number[], seed: number): SpatialPoint[] {
+  const rand = mulberry32(seed);
+  const flagged = new Set(flaggedRows);
+  const unflaggedCount = Math.min(rowCount, MAX_POINTS) - flaggedRows.length;
+  const stride = Math.max(1, Math.ceil((rowCount - flaggedRows.length) / Math.max(1, unflaggedCount)));
+  const rows = [...flaggedRows];
+  for (let r = 1; r <= rowCount && rows.length < Math.min(rowCount, MAX_POINTS); r += stride) {
+    if (!flagged.has(r)) rows.push(r);
+  }
+  return rows.map((row_number) => {
+    const isFlagged = flagged.has(row_number);
+    const [cx, cy, cz, spread] = isFlagged ? [0.7, 0.6, -0.65, 0.25] : [-0.2, -0.15, 0.2, 0.9];
+    const j = () => (rand() - 0.5) * spread;
+    return {
+      entity,
+      row_number,
+      x: round(cx + j()),
+      y: round(cy + j()),
+      z: round(cz + j()),
+      flagged: isFlagged,
+      outlier_score: round(isFlagged ? -0.16 - rand() * 0.15 : 0.02 + rand() * 0.2),
+    };
+  });
+}
+
+export const FNB_POINTS: SpatialPoint[] = [
+  ...buildPoints("INV_LEDGER_94", 4820, NEGATIVE_STOCK_ROWS, 9408),
+  ...buildPoints("MASTER_HUBS_MY", 42, [], 9409),
+  ...buildPoints("POS_PRICE_TIER", 1190, ZERO_PRICE_ROWS, 9410),
+];
+
+function scoresFor(entity: string): Record<number, number> {
+  const scores = Object.fromEntries(
+    FNB_POINTS.filter((p) => p.entity === entity && p.flagged).map((p) => [p.row_number, p.outlier_score]),
+  );
+  // Rows called out in the fixture narrative keep their documented scores.
+  if (entity === "INV_LEDGER_94") scores[1402] = -0.31;
+  if (entity === "POS_PRICE_TIER") scores[88] = -0.18;
+  return scores;
+}
+
+const ledgerRow = (r: number, qty: string, hub: string) => ({
+  row_number: r,
+  values: { txn_id: `TXN${9000 + (r % 1000)}`, sku_code: "SKU-8821", qty_delta: qty, dest_hub_id: hub },
+});
+
+export const FNB_DETERMINISTIC: Anomaly[] = [
+  {
+    id: "fnb-orphan-hub",
+    name: "orphan_foreign_key",
+    entity: "INV_LEDGER_94",
+    field: "dest_hub_id",
+    affected_rows: ORPHAN_HUB_ROWS,
+    affected_row_count: ORPHAN_HUB_ROWS.length,
+    sample_rows: ORPHAN_HUB_ROWS.map((r) => ledgerRow(r, r === 1402 ? "-00420" : "+00012", "PJ-999")),
+    severity: "critical",
+    confidence: 0.98,
+    root_cause: "Hub PJ-999 is missing from MASTER_HUBS_MY; the Petaling Jaya sub-warehouse code was never migrated.",
+    source: "deterministic",
+  },
+  {
+    id: "fnb-negative-stock",
+    name: "negative_stock",
+    entity: "INV_LEDGER_94",
+    field: "qty_delta",
+    affected_rows: NEGATIVE_STOCK_ROWS,
+    affected_row_count: 38,
+    sample_rows: NEGATIVE_STOCK_ROWS.slice(0, 5).map((r) => ledgerRow(r, r === 1402 ? "-00420" : "-00036", r === 1402 ? "PJ-999" : "KL-001")),
+    severity: "critical",
+    confidence: 0.96,
+    root_cause: "Running stock goes negative (-420 at row 1402); OCR ink bleed flipped sign bits on the scanned manifest.",
+    source: "deterministic",
+  },
+];
+
+export const FNB_ML_ANOMALIES: Anomaly[] = [
+  {
+    id: "fnb-outlier-qty",
+    name: "statistical_outlier",
+    entity: "INV_LEDGER_94",
+    field: "qty_delta",
+    affected_rows: NEGATIVE_STOCK_ROWS,
+    affected_row_count: NEGATIVE_STOCK_ROWS.length,
+    sample_rows: [ledgerRow(1402, "-00420", "PJ-999")],
+    severity: "medium",
+    confidence: 0.84,
+    root_cause: `Isolation Forest scored these stock deltas below ${OUTLIER_THRESHOLD}; row 1402 scored -0.31.`,
+    source: "ml",
+    outlier_scores: scoresFor("INV_LEDGER_94"),
+  },
+  {
+    id: "fnb-outlier-price",
+    name: "statistical_outlier",
+    entity: "POS_PRICE_TIER",
+    field: "unit_price_myr",
+    affected_rows: ZERO_PRICE_ROWS,
+    affected_row_count: ZERO_PRICE_ROWS.length,
+    sample_rows: ZERO_PRICE_ROWS.slice(0, 3).map((r) => ({
+      row_number: r,
+      values: { sku_code: r === 88 ? "SKU-8821" : `SKU-${4000 + r}`, unit_price_myr: "0000.00" },
+    })),
+    severity: "medium",
+    confidence: 0.79,
+    root_cause: "12 active SKUs have a 0.00 MYR unit price, consistent with fixed-width decimal truncation.",
+    source: "ml",
+    outlier_scores: scoresFor("POS_PRICE_TIER"),
+  },
+];
+
+export const FNB_SCHEMA: SchemaPayload = {
+  entities: FNB_ENTITIES,
+  copybook_used: false,
+  llm_provider: "ilmu",
+  raw_preview: null,
+};
+
+export const FNB_ML: MlResult = {
+  anomalies: FNB_ML_ANOMALIES,
+  skipped_entities: [],
+  points: FNB_POINTS,
+};
+
+export const FNB_ROT: RotResult = {
+  anomalies: [...FNB_DETERMINISTIC, ...FNB_ML_ANOMALIES],
+  semantic_checks: "completed",
+  semantic_skip_reason: null,
+  error: null,
+};
+
+export const FNB_RESURRECTION: ResurrectionResult = {
+  source: [
+    "from fastapi import APIRouter",
+    "from pydantic import BaseModel, Field",
+    "",
+    'router = APIRouter(prefix="/v1/inventory", tags=["Resurrected Ledger"])',
+    "",
+    "",
+    "class InventoryLedgerItem(BaseModel):",
+    "    txn_id: str",
+    "    sku_code: str",
+    '    qty_delta: int = Field(..., ge=0, description="Guarded against legacy sign-bit corruption")',
+    "    dest_hub_id: str",
+    "",
+    "",
+    "class MasterHub(BaseModel):",
+    "    hub_id: str",
+    "    region: str",
+    "",
+    "",
+    "class PosPriceTier(BaseModel):",
+    "    sku_code: str",
+    "    unit_price_myr: float = Field(..., gt=0)",
+    "",
+    "",
+    '@router.post("/ingest", response_model=InventoryLedgerItem)',
+    "async def ingest_ledger_row(item: InventoryLedgerItem) -> InventoryLedgerItem:",
+    "    return item",
+    "",
+  ].join("\n"),
+  syntax_ok: true,
+  syntax_error: null,
+  indexing: { status: "indexed", record_count: 4820 + 42 + 1190 },
+  models: ["InventoryLedgerItem", "MasterHub", "PosPriceTier"],
+};

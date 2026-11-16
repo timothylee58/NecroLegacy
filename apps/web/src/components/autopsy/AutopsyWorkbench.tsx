@@ -12,7 +12,7 @@ import {
 import type { CreateSessionResponse, SessionEvent } from "@/types/autopsy";
 import { AutopsyCanvasDynamic } from "./AutopsyCanvas";
 import { AutopsySummary } from "./AutopsySummary";
-import { DropzoneModal } from "./DropzoneModal";
+import { DropzoneModal, PRESETS } from "./DropzoneModal";
 import { EntityList } from "./EntityList";
 import { GeneratedCodeView } from "./GeneratedCodeView";
 import { LiveAnnouncer, useAnnounce } from "./LiveAnnouncer";
@@ -22,6 +22,12 @@ import { SearchPanel } from "./SearchPanel";
 import { VisionXRayOverlay } from "./VisionXRayOverlay";
 
 const SUMMARY_ID = "autopsy-summary";
+
+function sourceNameOf(input: SessionInput): string {
+  if (input.kind === "preset") return PRESETS.find((p) => p.id === input.preset)?.label ?? input.preset;
+  if (input.kind === "file") return input.copybook ? `${input.file.name} + ${input.copybook.name}` : input.file.name;
+  return "Pasted text";
+}
 
 function Workbench() {
   const announce = useAnnounce();
@@ -33,6 +39,7 @@ function Workbench() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [sourceName, setSourceName] = useState<string | null>(null);
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
   const lastEventIdRef = useRef(0);
   const objectUrlRef = useRef<string | null>(null);
@@ -80,6 +87,7 @@ function Workbench() {
       setEvents([]);
       setInspectorOpen(false);
       setSessionId(response.session_id);
+      setSourceName(sourceNameOf(input));
       dispatch({ type: "session_started", inputKind: response.input_kind, cached: response.cached });
       if (response.input_kind === "image") {
         if (input.kind === "preset") setImageUrl(client.presetImageUrl(input.preset));
@@ -117,16 +125,30 @@ function Workbench() {
   const showXRay = state.inputKind === "image" && state.vision !== null && imageUrl !== null;
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-4 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">NecroLegacy</h1>
-        <button
+    <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:p-6">
+      <header className="flex flex-col justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="font-mono text-2xl font-bold tracking-tight text-emerald-400">
+            NECROLEGACY {"//"} DIGITAL AUTOPSY WORKBENCH
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            OpenCV vision extraction · scikit-learn Isolation Forest and PCA · LangGraph multi-agent forensics
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {sourceName && (
+            <span className="rounded-full border border-emerald-800 bg-emerald-950/50 px-3 py-1 font-mono text-xs text-emerald-300">
+              Active dump: {sourceName}
+            </span>
+          )}
+          <button
           type="button"
           onClick={() => setDropzoneOpen(true)}
           className="rounded-md border px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           New autopsy
-        </button>
+          </button>
+        </div>
       </header>
 
       <DropzoneModal client={client} onSession={onSession} open={dropzoneOpen} onOpenChange={setDropzoneOpen} />
@@ -160,8 +182,9 @@ function Workbench() {
       )}
       {state.phase === "failed" && <p role="alert">The autopsy failed. Partial results are shown where available.</p>}
 
+      <div className={showXRay ? "grid grid-cols-1 gap-6 lg:grid-cols-12" : "flex flex-col"}>
       {showXRay && state.vision && imageUrl && (
-        <section aria-label="Uploaded image">
+        <section aria-label="Uploaded image" className="lg:col-span-5">
           <VisionXRayOverlay
             imageUrl={imageUrl}
             imageWidth={state.vision.image_width}
@@ -177,7 +200,7 @@ function Workbench() {
         <img src={imageUrl} alt="Uploaded document" className="max-h-64 w-auto object-contain" />
       )}
 
-      <div ref={canvasRegionRef} tabIndex={-1} className="min-h-[24rem]">
+      <div ref={canvasRegionRef} tabIndex={-1} className={showXRay ? "min-h-[24rem] lg:col-span-7" : "min-h-[24rem]"}>
         <AutopsyCanvasDynamic
           entities={entities}
           anomalies={anomalies}
@@ -187,6 +210,7 @@ function Workbench() {
           onSelect={(id) => openEntity(id, null)}
           onOpenEntity={openEntity}
         />
+      </div>
       </div>
 
       <AutopsySummary id={SUMMARY_ID} entities={entities} anomalies={anomalies} />

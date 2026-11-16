@@ -7,7 +7,16 @@ import type {
   SessionEvent,
   Severity,
 } from "@/types/autopsy";
-import { IMAGE_EVENT_SCRIPT, LEDGER_ANOMALIES, MOCK_IMAGE_DATA_URI, TEXT_EVENT_SCRIPT, playEvents } from "./mock-autopsy";
+import {
+  FNB_DATASET,
+  FNB_EVENT_SCRIPT,
+  IMAGE_EVENT_SCRIPT,
+  LEDGER_DATASET,
+  MOCK_IMAGE_DATA_URI,
+  TEXT_EVENT_SCRIPT,
+  playEvents,
+  type MockDataset,
+} from "./mock-autopsy";
 import type { SessionHandlers } from "./sse-client";
 
 export type { SessionHandlers } from "./sse-client";
@@ -44,8 +53,21 @@ function isImageInput(input: SessionInput): boolean {
   return false;
 }
 
+function mockSessionFor(input: SessionInput): { script: SessionEvent[]; dataset: MockDataset } {
+  if (isImageInput(input)) return { script: IMAGE_EVENT_SCRIPT, dataset: FNB_DATASET };
+  if (input.kind === "preset" && input.preset === "fnb_pos_corrupted") {
+    return { script: FNB_EVENT_SCRIPT, dataset: FNB_DATASET };
+  }
+  return { script: TEXT_EVENT_SCRIPT, dataset: LEDGER_DATASET };
+}
+
+interface MockSession {
+  script: SessionEvent[];
+  dataset: MockDataset;
+}
+
 export class MockClient implements AutopsyClient {
-  private sessions = new Map<string, SessionEvent[]>();
+  private sessions = new Map<string, MockSession>();
   private counter = 0;
 
   async createSession(input: SessionInput, signal?: AbortSignal): Promise<CreateSessionResponse> {
@@ -53,12 +75,12 @@ export class MockClient implements AutopsyClient {
     const image = isImageInput(input);
     this.counter += 1;
     const sessionId = `mock-session-${this.counter}`;
-    this.sessions.set(sessionId, image ? IMAGE_EVENT_SCRIPT : TEXT_EVENT_SCRIPT);
+    this.sessions.set(sessionId, mockSessionFor(input));
     return { session_id: sessionId, input_kind: image ? "image" : "text", cached: false };
   }
 
   subscribe(sessionId: string, handlers: SessionHandlers, lastEventId = 0): Unsubscribe {
-    const script = this.sessions.get(sessionId);
+    const script = this.sessions.get(sessionId)?.script;
     if (!script) {
       handlers.onConnectionLost();
       return () => {};
@@ -71,9 +93,10 @@ export class MockClient implements AutopsyClient {
     if (signal?.aborted) throw abortError();
     const q = query.trim().toLowerCase();
     if (!q || !this.sessions.has(sessionId)) return { hits: [] };
+    const anomalies = this.anomaliesFor(sessionId);
 
     const byRow = new Map<string, SearchHit>();
-    for (const a of this.allAnomalies()) {
+    for (const a of anomalies) {
       for (const row of a.sample_rows) {
         const preview = Object.entries(row.values)
           .map(([k, v]) => `${k}=${v}`)
@@ -100,7 +123,7 @@ export class MockClient implements AutopsyClient {
 
   async getAnomalies(sessionId: string, f: AnomalyFilter = {}): Promise<Anomaly[]> {
     if (!this.sessions.has(sessionId)) return [];
-    return this.allAnomalies().filter(
+    return this.anomaliesFor(sessionId).filter(
       (a) => (!f.severity || a.severity === f.severity) && (!f.entity || a.entity === f.entity),
     );
   }
@@ -109,8 +132,8 @@ export class MockClient implements AutopsyClient {
     return MOCK_IMAGE_DATA_URI;
   }
 
-  private allAnomalies(): Anomaly[] {
-    return [...LEDGER_ANOMALIES.deterministic, ...LEDGER_ANOMALIES.ml];
+  private anomaliesFor(sessionId: string): Anomaly[] {
+    return this.sessions.get(sessionId)?.dataset.rot.anomalies ?? [];
   }
 }
 

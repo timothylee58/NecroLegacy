@@ -14,6 +14,7 @@ import type {
   VisionDefect,
   VisionResult,
 } from "@/types/autopsy";
+import { FNB_ML, FNB_RESURRECTION, FNB_ROT, FNB_SCHEMA } from "./mock-fnb";
 
 export const NODE_ORDER: readonly NodeName[] = [
   "vision_extractor",
@@ -233,12 +234,13 @@ const ORIGIN_Y = 50;
 const GAP_X = 10;
 const GAP_Y = 10;
 
-const HEADER = ["ITEM", "QTY", "UNIT", "TOTAL"];
+// Same synthetic F&B batch as mock-fnb.ts: the smudged sign bit on row 1 is the -420 stock delta to PJ-999.
+const HEADER = ["SKU", "QTY", "DEST_HUB", "TOTAL_RM"];
 const BODY: string[][] = [
-  ["BOLT-M8", "120", "0.45", "54.00"],
-  ["NUT-M8", "300", "0.12", "36.00"],
-  ["WASHER", "500", "0.05", "25.00"],
-  ["GASKET", "40", "2.50", "100.00"],
+  ["SKU-8821", "-420", "PJ-999", "-6090.00"],
+  ["SKU-1043", "120", "KL-001", "384.00"],
+  ["SKU-2210", "300", "KL-001", "960.00"],
+  ["SKU-3307", "45", "SA-002", "351.00"],
 ];
 
 const DEFECT_AT: Record<string, DefectType> = {
@@ -320,6 +322,27 @@ export const MOCK_IMAGE_DATA_URI = buildImageDataUri();
 
 // ---------------------------------------------------------------- event scripts
 
+export interface MockDataset {
+  schema: SchemaPayload;
+  ml: MlResult;
+  rot: RotResult;
+  resurrection: ResurrectionResult;
+}
+
+export const LEDGER_DATASET: MockDataset = {
+  schema: LEDGER_SCHEMA,
+  ml: LEDGER_ML,
+  rot: LEDGER_ROT,
+  resurrection: LEDGER_RESURRECTION,
+};
+
+export const FNB_DATASET: MockDataset = {
+  schema: FNB_SCHEMA,
+  ml: FNB_ML,
+  rot: FNB_ROT,
+  resurrection: FNB_RESURRECTION,
+};
+
 type NodePayloads = {
   vision_extractor: VisionResult;
   schema_archaeologist: SchemaPayload;
@@ -335,18 +358,23 @@ function completedEvent<N extends NodeName>(id: number, node: N, payload: NodePa
 export interface ScriptOptions {
   input?: "text" | "image";
   variant?: "default" | "rot_detector_failure" | "ml_skipped";
+  dataset?: MockDataset;
 }
 
-export function buildEventScript({ input = "text", variant = "default" }: ScriptOptions = {}): SessionEvent[] {
+export function buildEventScript({
+  input = "text",
+  variant = "default",
+  dataset = LEDGER_DATASET,
+}: ScriptOptions = {}): SessionEvent[] {
   const events: SessionEvent[] = [];
   const push = (e: (id: number) => SessionEvent) => events.push(e(events.length + 1));
 
   const nodePayloads: NodePayloads = {
     vision_extractor: MOCK_VISION,
-    schema_archaeologist: LEDGER_SCHEMA,
-    ml_rot_scorer: LEDGER_ML,
-    rot_detector: LEDGER_ROT,
-    api_resurrector: LEDGER_RESURRECTION,
+    schema_archaeologist: dataset.schema,
+    ml_rot_scorer: dataset.ml,
+    rot_detector: dataset.rot,
+    api_resurrector: dataset.resurrection,
   };
 
   for (const node of NODE_ORDER) {
@@ -384,7 +412,8 @@ export function buildEventScript({ input = "text", variant = "default" }: Script
 }
 
 export const TEXT_EVENT_SCRIPT: SessionEvent[] = buildEventScript({ input: "text" });
-export const IMAGE_EVENT_SCRIPT: SessionEvent[] = buildEventScript({ input: "image" });
+export const FNB_EVENT_SCRIPT: SessionEvent[] = buildEventScript({ input: "text", dataset: FNB_DATASET });
+export const IMAGE_EVENT_SCRIPT: SessionEvent[] = buildEventScript({ input: "image", dataset: FNB_DATASET });
 export const ROT_DETECTOR_FAILURE_SCRIPT: SessionEvent[] = buildEventScript({ variant: "rot_detector_failure" });
 export const ML_SKIPPED_SCRIPT: SessionEvent[] = buildEventScript({ variant: "ml_skipped" });
 
