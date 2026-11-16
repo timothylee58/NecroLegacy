@@ -28,18 +28,18 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 19.1, 17.8, 17.9, 18.2_
 
 - [ ] 2. Web types, mock data and client abstraction
-  - [-] 2.1 Define the wire types
+  - [x] 2.1 Define the wire types
     - Create `apps/web/src/types/autopsy.ts` with every type from the design's TypeScript section (`NodeName`, `Severity`, `BoundingBox`, `VisionCell`, `VisionDefect`, `VisionResult`, `SchemaField`, `Entity`, `Anomaly`, `SpatialPoint`, `SessionEvent` union, `SchemaPayload`, `MlResult`, `RotResult`, `ResurrectionResult`, `SearchResponse`, `CreateSessionResponse`, `ErrorResponse`, `PresetId`)
     - Keys are snake_case to match the API wire format
     - _Requirements: 19.9, 10.2, 10.3, 11.13, 12.12_
-  - [-] 2.2 Implement upload validation
+  - [x] 2.2 Implement upload validation
     - Create `src/lib/file-validation.ts` exporting the shared limits (text 5,242,880, image 10,485,760), a case-insensitive extension check for the seven extensions, a `>` size comparison so the exact limit passes, and an image signature check reading the first 8 bytes with `file.slice(0, 8).arrayBuffer()`
     - Return typed rejection reasons that carry the alert text (seven extensions, 5 MB limit, 10 MB image limit)
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.8_
-  - [~] 2.3 Write unit tests for file validation
+  - [-] 2.3 Write unit tests for file validation
     - Cover extensions in mixed case, exact-limit and limit+1 sizes for text and image, PNG/JPEG signature mismatches
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.8_
-  - [~] 2.4 Build the mock autopsy fixtures and event player
+  - [-] 2.4 Build the mock autopsy fixtures and event player
     - Create `src/lib/mock-autopsy.ts` with fixtures: ledger preset (3 entities: one critical orphan FK, one `statistical_outlier`, one clean; 600 points per entity including a flagged and an unflagged cluster), a text-input event script (first event `vision_extractor` skipped `text_input`), and an image fixture (5 rows by 4 columns, one `smudged_digit`, one `torn_total`, one `misaligned_column`, SVG data-URI image generated from the same boxes)
     - Provide a timed generator that emits `started` and `completed` events per node ending with a `terminal` event, plus a rot_detector failure variant and a skipped-ML variant
     - _Requirements: 11.13, 12.12, 10.2, 10.5, 6.8, 19.8_
@@ -47,7 +47,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Create `src/lib/api-client.ts` with the `AutopsyClient`, `SessionInput`, `SessionHandlers` interfaces and `createClient()` returning the mock client when `NEXT_PUBLIC_USE_MOCK === "true"`
     - Implement `MockClient` (createSession, subscribe with `lastEventId` replay, search over fixtures, getAnomalies with severity and entity filters, presetImageUrl)
     - _Requirements: 19.8, 19.9, 16.2, 14.3_
-  - [~] 2.6 Implement the fetch-based SSE client
+  - [-] 2.6 Implement the fetch-based SSE client
     - Create `src/lib/sse-client.ts` with `openSessionStream(url, lastEventId, handlers)` using `fetch` + `ReadableStream`, an `id:`/`event:`/`data:` frame parser tolerant of arbitrary chunk splits, `Last-Event-ID` header, duplicate suppression by highest seen ID, retries at 1, 2, 4, 8, 16 s, attempt counter reset on success, `onConnectionLost()` after the fifth failed attempt, and no retry after a `terminal` event
     - _Requirements: 10.7, 10.9_
   - [~] 2.7 Write unit tests for the SSE client
@@ -73,13 +73,13 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 1.2, 1.4, 1.9, 1.10, 1.13_
 
 - [ ] 4. Autopsy_Table 3D scene
-  - [-] 4.1 Implement scene helpers
+  - [x] 4.1 Implement scene helpers
     - Create `src/lib/scene/layout.ts` (seeded `mulberry32(hash(entityNames))` force layout, 200 iterations, sphere radius 6), `palette.ts` (crimson `#DC143C`, slate `#94A3B8`), and `webgl.ts` (throwaway-canvas probe for `webgl2` then `webgl`)
     - _Requirements: 11.1, 11.5, 11.7, 11.11_
-  - [~] 4.2 Write unit tests for layout determinism
+  - [-] 4.2 Write unit tests for layout determinism
     - Same entity names give identical positions; points equal node position plus a constant scale times coordinates
     - _Requirements: 11.5, 11.7_
-  - [~] 4.3 Implement `AutopsyScene` class
+  - [-] 4.3 Implement `AutopsyScene` class
     - Create `src/lib/scene/AutopsyScene.ts` (no React imports) with `setGraph`, `setHighlights`, `setReducedMotion`, `resize`, `dispose`
     - Node spheres with a pulse of one cycle per 2 s for entities without Anomalies, crimson nodes and animated shader arcs on edges touching critical Anomalies, one `THREE.Points` per entity (flagged crimson, others slate) at `nodePosition + 1.5 * (x, y, z)`, raycaster picking calling `onSelect`
     - Reduced-motion mode: no pulse or moving arc; teal halo ring for healthy, crimson fill plus solid thick arc and diamond marker for critical; render on demand
@@ -93,7 +93,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 11.11, 11.14, 11.10, 18.8_
 
 - [ ] 5. Entity list, summary, announcer and progress
-  - [-] 5.1 Implement accessibility helpers
+  - [x] 5.1 Implement accessibility helpers
     - Create `src/lib/a11y/summary.ts` (per-entity name, counts of low/medium/critical including zeros, related entity names; announcement helper capped at 250 characters) and `src/lib/a11y/contrast.ts` (WCAG ratio helper)
     - _Requirements: 18.3, 18.4, 18.7_
   - [~] 5.2 Build `EntityList`, `AutopsySummary`, `LiveAnnouncer`, `ProgressRail`

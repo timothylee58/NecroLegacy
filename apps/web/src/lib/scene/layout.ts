@@ -1,5 +1,3 @@
-type DenseArray = Float64Array & { [i: number]: number };
-
 export type Vec3 = readonly [number, number, number];
 
 export interface LayoutEdge {
@@ -44,6 +42,11 @@ export function pointPosition(node: Vec3, coords: Vec3): Vec3 {
   ];
 }
 
+interface Body {
+  p: [number, number, number];
+  f: [number, number, number];
+}
+
 /** Pure, deterministic for a given ordered name list and edge list. */
 export function computeLayout(
   entityNames: readonly string[],
@@ -53,34 +56,42 @@ export function computeLayout(
   const result = new Map<string, Vec3>();
   if (n === 0) return result;
   if (n === 1) {
-    result.set(first, [0, 0, 0]);
+    result.set(entityNames[0] as string, [0, 0, 0]);
     return result;
   }
 
   const rand = mulberry32(hashNames(entityNames));
-  const first = entityNames[0] as string;
-  const pos = new Float64Array(n * 3) as DenseArray;
-  for (let i = 0; i < n * 3; i++) pos[i] = (rand() * 2 - 1) * SPHERE_RADIUS;
+  const bodies: Body[] = entityNames.map(() => ({
+    p: [
+      (rand() * 2 - 1) * SPHERE_RADIUS,
+      (rand() * 2 - 1) * SPHERE_RADIUS,
+      (rand() * 2 - 1) * SPHERE_RADIUS,
+    ],
+    f: [0, 0, 0],
+  }));
 
   const index = new Map<string, number>();
   entityNames.forEach((name, i) => index.set(name, i));
-  const links: Array<[number, number]> = [];
+  const links: Array<[Body, Body]> = [];
   for (const e of edges) {
     const s = index.get(e.source);
     const t = index.get(e.target);
-    if (s !== undefined && t !== undefined && s !== t) links.push([s, t]);
+    const a = s === undefined ? undefined : bodies[s];
+    const b = t === undefined ? undefined : bodies[t];
+    if (a && b && a !== b) links.push([a, b]);
   }
 
   const k = SPHERE_RADIUS;
-  const force = new Float64Array(n * 3) as DenseArray;
   for (let iter = 0; iter < LAYOUT_ITERATIONS; iter++) {
     const temp = (1 - iter / LAYOUT_ITERATIONS) * 0.5 + 0.01;
-    force.fill(0);
+    for (const b of bodies) b.f = [0, 0, 0];
     for (let i = 0; i < n; i++) {
+      const a = bodies[i] as Body;
       for (let j = i + 1; j < n; j++) {
-        let dx = pos[i * 3] - pos[j * 3];
-        let dy = pos[i * 3 + 1] - pos[j * 3 + 1];
-        let dz = pos[i * 3 + 2] - pos[j * 3 + 2];
+        const b = bodies[j] as Body;
+        let dx = a.p[0] - b.p[0];
+        let dy = a.p[1] - b.p[1];
+        let dz = a.p[2] - b.p[2];
         let d2 = dx * dx + dy * dy + dz * dz;
         if (d2 < 1e-6) {
           dx = rand() - 0.5;
@@ -89,48 +100,35 @@ export function computeLayout(
           d2 = dx * dx + dy * dy + dz * dz + 1e-6;
         }
         const f = (k * k) / d2;
-        force[i * 3] += dx * f;
-        force[i * 3 + 1] += dy * f;
-        force[i * 3 + 2] += dz * f;
-        force[j * 3] -= dx * f;
-        force[j * 3 + 1] -= dy * f;
-        force[j * 3 + 2] -= dz * f;
+        a.f = [a.f[0] + dx * f, a.f[1] + dy * f, a.f[2] + dz * f];
+        b.f = [b.f[0] - dx * f, b.f[1] - dy * f, b.f[2] - dz * f];
       }
     }
-    for (const [s, t] of links) {
-      const dx = pos[s * 3] - pos[t * 3];
-      const dy = pos[s * 3 + 1] - pos[t * 3 + 1];
-      const dz = pos[s * 3 + 2] - pos[t * 3 + 2];
-      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const f = d / k;
-      force[s * 3] -= dx * f;
-      force[s * 3 + 1] -= dy * f;
-      force[s * 3 + 2] -= dz * f;
-      force[t * 3] += dx * f;
-      force[t * 3 + 1] += dy * f;
-      force[t * 3 + 2] += dz * f;
+    for (const [a, b] of links) {
+      const dx = a.p[0] - b.p[0];
+      const dy = a.p[1] - b.p[1];
+      const dz = a.p[2] - b.p[2];
+      const f = Math.sqrt(dx * dx + dy * dy + dz * dz) / k;
+      a.f = [a.f[0] - dx * f, a.f[1] - dy * f, a.f[2] - dz * f];
+      b.f = [b.f[0] + dx * f, b.f[1] + dy * f, b.f[2] + dz * f];
     }
-    for (let i = 0; i < n; i++) {
+    for (const b of bodies) {
       // Weak pull to the origin keeps disconnected nodes from drifting apart.
-      const fx = force[i * 3] - pos[i * 3] * 0.05;
-      const fy = force[i * 3 + 1] - pos[i * 3 + 1] * 0.05;
-      const fz = force[i * 3 + 2] - pos[i * 3 + 2] * 0.05;
+      const fx = b.f[0] - b.p[0] * 0.05;
+      const fy = b.f[1] - b.p[1] * 0.05;
+      const fz = b.f[2] - b.p[2] * 0.05;
       const mag = Math.sqrt(fx * fx + fy * fy + fz * fz) || 1;
       const step = Math.min(mag, temp * k) / mag;
-      pos[i * 3] += fx * step;
-      pos[i * 3 + 1] += fy * step;
-      pos[i * 3 + 2] += fz * step;
+      b.p = [b.p[0] + fx * step, b.p[1] + fy * step, b.p[2] + fz * step];
     }
   }
 
   let maxR = 0;
-  for (let i = 0; i < n; i++) {
-    const r = Math.hypot(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-    if (r > maxR) maxR = r;
-  }
+  for (const b of bodies) maxR = Math.max(maxR, Math.hypot(b.p[0], b.p[1], b.p[2]));
   const scale = maxR > 0 ? SPHERE_RADIUS / maxR : 1;
   entityNames.forEach((name, i) => {
-    result.set(name, [pos[i * 3] * scale, pos[i * 3 + 1] * scale, pos[i * 3 + 2] * scale]);
+    const b = bodies[i] as Body;
+    result.set(name, [b.p[0] * scale, b.p[1] * scale, b.p[2] * scale]);
   });
   return result;
 }
