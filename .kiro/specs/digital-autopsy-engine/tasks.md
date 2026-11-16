@@ -153,31 +153,31 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 
 ### Phase 2: FastAPI service
 
-- [ ] 11. API foundation
-  - [ ] 11.1 Scaffold `apps/api`
+- [x] 11. API foundation
+  - [x] 11.1 Scaffold `apps/api`
     - Create `pyproject.toml` and pinned `requirements.txt` (FastAPI, pydantic v2, pydantic-settings, langgraph, httpx, redis, psycopg[binary,pool], pgvector, opencv-python-headless, numpy, scikit-learn, paddleocr CPU, pytesseract, Jinja2; dev: pytest, pytest-asyncio, hypothesis, respx, fakeredis, ruff, mypy, import-linter)
     - Do not list `opencv-python`, `torch`, `nvidia-*` or `cuda*`
     - Create `app/` package layout and `tests/{unit,property,integration,contract}` with `tests/strategies.py`
     - _Requirements: 19.1, 19.13, 4.19, 4.20, 6.19_
-  - [ ] 11.2 Implement configuration and errors
+  - [x] 11.2 Implement configuration and errors
     - `app/core/config.py` (`Settings` with `SecretStr`): start-fatal `WEB_ORIGIN`, `REDIS_URL`, `SUPABASE_DB_URL` naming the missing variable without printing values; optional provider keys; `OCR_ENGINE` default `paddleocr` with one warning on invalid value; `CACHE_TTL_SECONDS` 60–604,800 default 86,400 with a warning; `SANITIZER_MAX_CHARS` 1–100,000 default 10,000; `MAX_CONCURRENT_SESSIONS`
     - Embedding settings: `EMBEDDING_PROVIDER` (`hash` default, or `api`), `EMBEDDING_API_URL`, `EMBEDDING_API_KEY` (`SecretStr`) and `EMBEDDING_MODEL`, required only for `api`; a missing value disables the `api` provider with one error naming the variable and uses `hash`
     - `app/core/errors.py` with `ErrorResponse` handlers: Pydantic `RequestValidationError` becomes `422 validation_error` listing failed fields with no state change and no echoed values; unhandled errors become `500 internal_error` with a correlation ID
     - _Requirements: 17.5, 17.6, 17.8, 17.9, 4.6, 15.4, 15.8, 8.5, 6.27_
-  - [ ] 11.3 Implement logging with redaction
+  - [x] 11.3 Implement logging with redaction
     - `app/core/logging.py`: filter dropping `extra` fields named `payload`, `content`, `text`, `bytes` and masking configured secret values; log only session ID, node, duration, sizes and codes
     - _Requirements: 17.11, 8.6_
-  - [ ] 11.4 Write property test for log hygiene
+  - [x] 11.4 Write property test for log hygiene
     - **Property 18: Log hygiene**
     - Canary strings in file content, OCR text and credentials never appear in any log record at any level (run once the pipeline exists in task 22; placed here with the logging code and extended there)
     - **Validates: Requirements 17.11, 8.6**
-  - [ ] 11.5 Implement wire schemas
+  - [x] 11.5 Implement wire schemas
     - `app/schemas/autopsy.py` with every Pydantic model from the design (`Wire` base with `extra="forbid", frozen=True`, `Score` with 2 dp rounding validator, `BoundingBox`, `VisionCell`, `VisionDefect`, `VisionResult`, `SchemaField`, `PrimaryKey`, `ForeignKey`, `Entity`, `SchemaResult`, `RawPreview`, `Anomaly`, `SpatialPoint`, `MlResult`, `RotResult`, `ResurrectionResult`, `SessionEvent`, `SearchRequest`, `SearchHit`, `SearchResponse`, `ErrorResponse`) and per-node payload model lookup
     - _Requirements: 17.5, 4.11, 5.4, 7.5, 7.6, 10.2, 14.5_
-  - [ ] 11.6 Implement EventLog and SessionStore
+  - [x] 11.6 Implement EventLog and SessionStore
     - `app/services/sessions.py`: `EventLog.append` assigns strictly increasing IDs from 1 under an `asyncio.Lock` and validates the payload against the model for `(type, node, state)`; `subscribe(after_id)` snapshots `events[after_id:]` then waits on an `asyncio.Condition`; in-process `SessionStore` with the `index_key`, retention of 7,200 s, `fold_events()` producing the snapshot
     - _Requirements: 10.1, 10.2, 10.4, 10.8, 14.8_
-  - [ ] 11.7 Write property test for SSE ordering and replay
+  - [x] 11.7 Write property test for SSE ordering and replay
     - **Property 12: SSE ordering and replay**
     - Include reconnect points `k` in `[0, n]`, concurrent appends during replay, and the web `sse-client` parsing arbitrary chunk splits of the same byte stream (a fast-check test in `apps/web/src/lib/sse-client.property.test.ts`)
     - **Validates: Requirements 10.2, 10.4, 10.8, 15.5**

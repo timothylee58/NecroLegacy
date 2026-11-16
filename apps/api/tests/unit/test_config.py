@@ -1,0 +1,59 @@
+import logging
+
+import pytest
+
+from app.core.config import ConfigError, load_settings
+
+
+@pytest.mark.parametrize("missing", ["WEB_ORIGIN", "REDIS_URL", "SUPABASE_DB_URL"])
+def test_missing_required_variable_is_named_without_values(env, missing):
+    env.delenv(missing)
+    with pytest.raises(ConfigError) as exc:
+        load_settings()
+    assert missing in str(exc.value)
+    assert "localhost" not in str(exc.value)
+
+
+def test_defaults(env):
+    s = load_settings()
+    assert (s.ocr_engine, s.cache_ttl_seconds, s.sanitizer_max_chars, s.max_concurrent_sessions) == (
+        "paddleocr",
+        86_400,
+        10_000,
+        2,
+    )
+    assert s.ilmu_api_key is None
+
+
+def test_invalid_ocr_engine_warns_once_and_defaults(env, caplog):
+    env.setenv("OCR_ENGINE", "magic")
+    with caplog.at_level(logging.WARNING, logger="necro.config"):
+        s = load_settings()
+    assert s.ocr_engine == "paddleocr"
+    assert len([r for r in caplog.records if "OCR_ENGINE" in r.getMessage()]) == 1
+
+
+@pytest.mark.parametrize("value", ["59", "604801", "abc", "-1"])
+def test_ttl_out_of_range_defaults_with_warning(env, caplog, value):
+    env.setenv("CACHE_TTL_SECONDS", value)
+    with caplog.at_level(logging.WARNING, logger="necro.config"):
+        assert load_settings().cache_ttl_seconds == 86_400
+    assert any("CACHE_TTL_SECONDS" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize(("value", "expected"), [("60", 60), ("604800", 604_800)])
+def test_ttl_boundaries_accepted(env, value, expected):
+    env.setenv("CACHE_TTL_SECONDS", value)
+    assert load_settings().cache_ttl_seconds == expected
+
+
+def test_sanitizer_and_sessions_ranges(env):
+    env.setenv("SANITIZER_MAX_CHARS", "100001")
+    env.setenv("MAX_CONCURRENT_SESSIONS", "9")
+    s = load_settings()
+    assert (s.sanitizer_max_chars, s.max_concurrent_sessions) == (10_000, 2)
+
+
+def test_secrets_are_not_in_repr(env):
+    env.setenv("ILMU_API_KEY", "super-secret-key")
+    assert "super-secret-key" not in repr(load_settings())

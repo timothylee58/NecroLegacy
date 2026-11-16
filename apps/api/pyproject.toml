@@ -1,0 +1,32 @@
+[project]
+name = "necrolegacy-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "ML and embeddings never import the LLM layer"
+type = "forbidden"
+source_modules = ["app.agents.nodes.ml_rot_scorer", "app.services.ml", "app.services.embeddings"]
+forbidden_modules = ["app.core.llm"]
