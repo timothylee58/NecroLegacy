@@ -3,7 +3,7 @@
 ## Core Stack
 - **Frontend (`apps/web`):** Next.js 15 (App Router), React 19 (functional components only), TypeScript (strict mode), Tailwind CSS, shadcn/ui, Framer Motion (default for all UI transitions), and Three.js (`@react-three/fiber` or vanilla Three.js canvas wrapper with proper WebGL disposal).
 - **Backend (`apps/api`):** Python 3.12+, FastAPI, Pydantic v2, LangGraph (`StateGraph`), Redis (TTL caching), and Supabase (`pgvector`).
-- **LLM Routing:** Default to YTL AI Labs' **ILMU API** for primary inference; automatically fall back to **Anthropic Claude** if ILMU times out or fails structured JSON validation.
+- **LLM Routing:** Default to **Amazon Bedrock** (Converse API, IAM/SigV4 auth). Primary inference uses an open-weight model (default `openai.gpt-oss-120b-1:0`); automatically fall back to **Anthropic Claude on Bedrock** if the primary times out, errors, or fails structured JSON validation. Text-only primaries never receive image requests; those go straight to the vision-capable fallback. `LLM_PROVIDER=openai_compatible` switches the same router to any OpenAI-compatible `/chat/completions` endpoint (OpenRouter, Together, Groq, vLLM). Wire values name the router role (`primary`/`fallback`), never a vendor.
 
 ## Development Workflow Order
 1. Build and verify responsive UI/UX components using typed mock data first (`apps/web/src/lib/mock-autopsy.ts`).

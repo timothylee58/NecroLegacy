@@ -4,7 +4,7 @@
 
 NecroLegacy is a greenfield monorepo (the repository currently holds only `.gitignore`, `LICENSE` and `.kiro/`). It takes a legacy text dump, a COBOL copybook, or a scanned/photographed table, runs a five-node LangGraph pipeline, and presents the result in a Three.js "Autopsy Table", a Vision X-Ray image overlay, and a Kiro MCP server.
 
-The five nodes run in a fixed order: `vision_extractor` (images only), `schema_archaeologist`, `ml_rot_scorer`, `rot_detector`, `api_resurrector`. Anything that can be computed deterministically is computed without an LLM: parsing, type inference, key inference, the six rule-based rot checks, IsolationForest scoring, PCA coordinates over record embeddings and code generation. LLMs are used only for (a) the vision-LLM table extraction fallback, (b) explaining the top ML outliers and referential breaks, and (c) a "silent corruption" sweep. Every LLM call goes through one router (ILMU first, Claude on failure within 3 seconds) and one sanitizer.
+The five nodes run in a fixed order: `vision_extractor` (images only), `schema_archaeologist`, `ml_rot_scorer`, `rot_detector`, `api_resurrector`. Anything that can be computed deterministically is computed without an LLM: parsing, type inference, key inference, the six rule-based rot checks, IsolationForest scoring, PCA coordinates over record embeddings and code generation. LLMs are used only for (a) the vision-LLM table extraction fallback, (b) explaining the top ML outliers and referential breaks, and (c) a "silent corruption" sweep. Every LLM call goes through one router (an open-weight primary on Amazon Bedrock first, Claude on Bedrock on failure within 3 seconds) and one sanitizer.
 
 Delivery order is fixed by Requirement 19.8: **Phase 1** web app on typed mock data (including Vision X-Ray and spatial points), **Phase 2** FastAPI service with SSE, cache and vector search, **Phase 3** MCP server. To make Phase 2 a drop-in replacement, the web app talks to an `AutopsyClient` interface with two implementations (mock and HTTP) that emit the identical `SessionEvent` stream.
 
@@ -30,8 +30,8 @@ Decisions that were open and are now closed:
 
 ### Assumptions
 
-1. ILMU exposes an OpenAI-compatible `POST {ILMU_BASE_URL}/chat/completions` with JSON output and `image_url` data-URI inputs. This is unconfirmed; the adapter is isolated in `core/llm.py` so only one class changes if wrong.
-2. Claude is called through the Anthropic Messages HTTP API with `ANTHROPIC_MODEL` (default `claude-sonnet-4-5`).
+1. The default LLM_Transport is the Amazon Bedrock Converse API (`POST https://bedrock-runtime.{AWS_REGION}.amazonaws.com/model/{modelId}/converse`), signed with AWS SigV4 by `botocore` from the standard credential chain and sent over the async `httpx` client (boto3 is synchronous, and `respx` stubs stay usable). The primary is the open-weight `openai.gpt-oss-120b-1:0`, which is text-only; the fallback is Claude Sonnet 4.5 through the `global.anthropic.claude-sonnet-4-5-20250929-v1:0` inference profile, which accepts images. Both identifiers are settings; model availability differs by region and must be enabled in the AWS account.
+2. `LLM_PROVIDER=openai_compatible` sends both models to `POST {LLM_BASE_URL}/chat/completions` with `image_url` data URIs and a bearer `LLM_API_KEY` (OpenRouter, Together, Groq, Fireworks or a self-hosted vLLM). Only the transport changes; routing, events and wire values are identical.
 3. Presets are authored as multi-record-type files (a 2-character record-type prefix) so that multiple entities and cross-entity foreign keys exist. They are produced by `scripts/generate_presets.py` with a fixed seed and are fully synthetic.
 4. Row numbers are 1-based positions in the parsed record list, with the header row counted as row 1 when present (for images, the grid row). Header rows are never entity data rows, so they never appear in anomalies.
 5. Browser calls are protected by CORS plus unguessable UUIDv4 session IDs. Only the MCP server sends the optional bearer token (`API_TOKEN`). CORS is not authentication; this is accepted for a hackathon-scale tool and noted in Security.
@@ -41,7 +41,7 @@ Decisions that were open and are now closed:
 | Conflict | Resolution |
 |---|---|
 | 3.1 allows `.cpy` up to 10 MB; 1.5/1.11 cap text uploads at 5 MB | The 5 MB upload limit applies at the API boundary. The parser has no lower internal cap and is tested to 10 MB. |
-| 17.9 says any component fails to start on a missing credential; 8.5 says the router reports a configuration error and skips the provider; 7.9 defines "no provider" as a supported mode | Missing `ILMU_API_KEY` or `ANTHROPIC_API_KEY` disables that provider with a logged configuration error naming the variable (8.5 is the specific rule). `WEB_ORIGIN`, `REDIS_URL` and `SUPABASE_DB_URL` are start-fatal. |
+| 17.9 says any component fails to start on a missing credential; 8.5 says the router reports a configuration error and skips the provider; 7.9 defines "no provider" as a supported mode | A missing `AWS_REGION` or unresolvable AWS credentials (bedrock), a missing `LLM_BASE_URL` or `LLM_API_KEY` (openai_compatible), or a blank `LLM_PRIMARY_MODEL`/`LLM_FALLBACK_MODEL` disables the affected model with a logged configuration error naming the variable (8.5 is the specific rule). `WEB_ORIGIN`, `REDIS_URL` and `SUPABASE_DB_URL` are start-fatal. |
 | 17.9 vs 16.11 for the MCP server | The MCP server starts (Kiro must list its tools), logs the missing variable name to stderr, and returns the 16.11 error on every tool call. |
 | 15.1 caches any successful session, but an indexing failure (14.2) leaves a session non-searchable for the TTL | Followed as written. A session whose indexing failed is still cached. Recorded as a known limitation; re-upload after TTL re-indexes. |
 | 14.8 "requesting session" vs cache hits creating new session IDs | `Session.index_key` is the ID of the session that originally indexed the content. A cache hit reuses that key. Different content never shares a key. |
@@ -77,8 +77,8 @@ flowchart LR
     N3 --> PP[(ProcessPool)]
     N1 --> PP
   end
-  R --> ILMU[ILMU API]
-  R -.fallback.-> CLA[Claude API]
+  R --> PRI[Primary: gpt-oss-120b on Bedrock]
+  R -.fallback.-> FBK[Fallback: Claude on Bedrock]
   CA --> RD[(Redis TTL)]
   VS --> PG[(Supabase pgvector)]
   MCP[packages/mcp-server] -->|HTTP + bearer| API
@@ -378,7 +378,7 @@ class AutopsyState(TypedDict, total=False):
 7. **Map boxes to the original image**: each cell rectangle's four corners go through the inverse of the deskew affine; take the integer axis-aligned bounds and clamp into the image; enforce width and height ≥ 1.
 8. **Confidence** is the engine's per-crop confidence in [0, 1], rounded to 2 dp. `smudged = confidence < 0.6` (0.6 is not flagged).
 9. **Defects** (4.13): `smudged_digit` for a smudged cell with a digit or an unreadable character (confidence = `1 − cell_confidence`); `torn_total` for a cell in a column headed "total" (case-insensitive) or in the last row whose text does not parse as a number, or whose contour is open (0.9 when text is invalid, 0.7 for open-only); `misaligned_column` for a cell whose centre x differs from the column median by more than 25% of the column's median cell width (confidence = `min(1, deviation / (0.5 × median_width))`).
-10. **Fallback**: if both engines fail, mean confidence < 0.4, grid < 2×2, or the local steps exceed 45 s (the pool is recycled to kill the worker), the node sends the image once to the router. The image is re-encoded from the decoded array with `cv2.imencode` (this drops EXIF and other metadata) and downscaled to at most 1568 px on the long edge; returned boxes are scaled back by the inverse factor. The response is validated against `VisionTable` (rows of cells with text, a box inside the image and confidence in [0, 1]); a box outside the image is a validation failure, so the router tries Claude. If this also fails or returns no rows the node fails with `no_table_detected`.
+10. **Fallback**: if both engines fail, mean confidence < 0.4, grid < 2×2, or the local steps exceed 45 s (the pool is recycled to kill the worker), the node sends the image once to the router. The image is re-encoded from the decoded array with `cv2.imencode` (this drops EXIF and other metadata) and downscaled to at most 1568 px on the long edge; returned boxes are scaled back by the inverse factor. The response is validated against `VisionTable` (rows of cells with text, a box inside the image and confidence in [0, 1]); a box outside the image is a validation failure, so the router tries the fallback model. With the default text-only primary, the image goes straight to the vision-capable fallback (8.9). If this also fails or returns no rows the node fails with `no_table_detected`.
 11. Cell text always goes through `sanitize_cell` (control characters removed, truncated to 1,000) before it is stored. More than 10,000 cells fails the node with `cell_limit_exceeded`, checked after grid detection and before OCR so the cost is never paid.
 
 **`schema_archaeologist`**: for text, parse first (copybook before data when both exist), then infer. The completion payload carries `raw_preview` (2.7). Stages:
@@ -434,14 +434,14 @@ class LLMRequest(Generic[T]):
 @dataclass
 class LLMResult(Generic[T]):
     data: T
-    provider: Literal["ilmu", "claude"]
+    provider: Literal["primary", "fallback"]
 
 class LLMRouter:
     def has_provider(self) -> bool
     async def complete(self, req: LLMRequest[T], events: EventSink | None = None) -> LLMResult[T]
 ```
 
-`complete` calls ILMU with a 30 s `httpx` timeout. On an HTTP error, a timeout, or a response that fails `response_model.model_validate_json` (code fences stripped, nothing else repaired), it calls `events.emit_fallback(failed_provider="ilmu", reason="error"|"timeout"|"validation")` and then calls Claude immediately. There is no retry, sleep or backoff on the ILMU side, so the fallback starts well within 3 s of detecting the failure, and the fallback event precedes the Claude send, so it is emitted within 1 s. A failure from Claude raises `ProviderFailure(attempts=[ProviderAttempt("ilmu", reason), ProviderAttempt("claude", reason)])`; the message includes no response body or credential. Images use the same order. A disabled provider (missing key, 8.5) is skipped. `ProviderFailure` with a provider already disabled lists it with reason `not_configured`. Credentials are read once from `Settings`; they exist only in the provider adapters' `Authorization` headers and are excluded from `repr` (`SecretStr`). The provider that answered is stored with the result (`LLMResult.provider`) and written into the Anomaly or SchemaResult field `llm_provider`.
+`complete` calls the primary model with a 30 s `httpx` timeout. On an HTTP error (including Bedrock throttling), a timeout, or a response that fails `response_model.model_validate_json` (code fences stripped, nothing else repaired), it calls `events.emit_fallback(failed_provider="primary", reason="error"|"timeout"|"validation")` and then calls the fallback model immediately. There is no retry, sleep or backoff on the primary side, so the fallback starts well within 3 s of detecting the failure, and the fallback event precedes the fallback send, so it is emitted within 1 s. A fallback failure raises `ProviderFailure(attempts=[ProviderAttempt("primary", reason), ProviderAttempt("fallback", reason)])`; the message includes no response body or credential. Converse responses from reasoning models carry `reasoningContent` blocks before the answer; the router reads the first `text` block. An image request to a text-only primary (`LLM_PRIMARY_VISION=false`, the default for gpt-oss) skips the primary with reason `unsupported_input` and no fallback event (8.9). A disabled model (8.5) is skipped and listed with reason `not_configured`. AWS credentials come from the standard chain (prefer an IAM role or a key scoped to `bedrock:InvokeModel` on the two model ARNs) and exist only in the SigV4 `Authorization` header of each request; `LLM_API_KEY` is a `SecretStr` that exists only in the bearer header. The provider that answered is stored with the result (`LLMResult.provider`) and written into the Anomaly or SchemaResult field `llm_provider`.
 
 ```python
 # services/sanitizer.py
@@ -641,7 +641,7 @@ class VisionDefect(Wire):
 class VisionResult(Wire):
     image_width: int; image_height: int
     skew_angle_degrees: float                               # one decimal place
-    engine: Literal["paddleocr", "tesseract", "ilmu", "claude"]
+    engine: Literal["paddleocr", "tesseract", "primary", "fallback"]
     cells: list[VisionCell]; defects: list[VisionDefect]
     # rows are derived: cells grouped by `row`, ordered by `col`
 
@@ -659,7 +659,7 @@ class Entity(Wire):
     row_count: int = Field(ge=0); record_length: int | None = None
 
 class SchemaResult(Wire):
-    entities: list[Entity]; copybook_used: bool; llm_provider: Literal["ilmu", "claude"] | None = None
+    entities: list[Entity]; copybook_used: bool; llm_provider: Literal["primary", "fallback"] | None = None
 
 class ParseError(Wire):  line: int = Field(ge=1); reason: str
 class RawPreview(Wire):
@@ -683,7 +683,7 @@ class Anomaly(Wire):
     severity: Severity; confidence: Score; root_cause: str = Field(min_length=1)
     source: Literal["deterministic", "ml", "llm"]
     outlier_scores: dict[int, float] | None = None
-    llm_provider: Literal["ilmu", "claude"] | None = None
+    llm_provider: Literal["primary", "fallback"] | None = None
 
 class SpatialPoint(Wire):
     entity: str; row_number: int = Field(ge=1)
@@ -750,7 +750,7 @@ export interface VisionCell { row: number; col: number; text: string; bbox: Boun
 export interface VisionDefect { type: DefectType; row: number; col: number; bbox: BoundingBox; confidence: number }
 export interface VisionResult {
   image_width: number; image_height: number; skew_angle_degrees: number;
-  engine: "paddleocr" | "tesseract" | "ilmu" | "claude"; cells: VisionCell[]; defects: VisionDefect[];
+  engine: "paddleocr" | "tesseract" | "primary" | "fallback"; cells: VisionCell[]; defects: VisionDefect[];
 }
 export interface SchemaField { name: string; type: FieldType; type_confidence: number; start: number; end: number; length: number; role: FieldRole }
 export interface Entity {
@@ -765,7 +765,7 @@ export interface Anomaly {
   sample_rows: { row_number: number; values: Record<string, string> }[];
   severity: Severity; confidence: number; root_cause: string;
   source: "deterministic" | "ml" | "llm"; outlier_scores?: Record<number, number> | null;
-  llm_provider?: "ilmu" | "claude" | null;
+  llm_provider?: "primary" | "fallback" | null;
 }
 export interface SpatialPoint { entity: string; row_number: number; x: number; y: number; z: number; flagged: boolean; outlier_score: number }
 // Frozen contract: SpatialPoint is unchanged. When the API is wired (task 24), `MlResult` in `apps/web/src/types/autopsy.ts` needs the optional fields `coordinate_source?: "embedding" | "numeric"` and `embedding_fallback_reason?: "provider_error" | "provider_timeout" | "invalid_embedding" | "degenerate_embedding" | null`; no component reads them, so the built web app is unaffected.
@@ -779,7 +779,7 @@ export type SessionEvent =
   | { id: number; type: "node"; node: NodeName; state: "started"; payload: Record<string, never> }
   | { id: number; type: "node"; node: NodeName; state: "skipped"; payload: { reason: string } }
   | { id: number; type: "node"; node: NodeName; state: "failed"; payload: { code: string; message: string } }
-  | { id: number; type: "fallback"; payload: { failed_provider: "ilmu"; reason: "error" | "timeout" | "validation" } }
+  | { id: number; type: "fallback"; payload: { failed_provider: "primary"; reason: "error" | "timeout" | "validation" } }
   | { id: number; type: "error"; payload: { node: NodeName; code: string; message: string } }
   | { id: number; type: "terminal"; payload: { status: "completed" | "failed"; failed_node?: NodeName } };
 ```
@@ -793,8 +793,11 @@ export type SessionEvent =
 | `WEB_ORIGIN` | api | yes (start-fatal) | single origin URL |
 | `REDIS_URL` | api | yes (start-fatal) | – |
 | `SUPABASE_DB_URL` | api | yes (start-fatal) | Postgres DSN |
-| `ILMU_API_KEY`, `ILMU_BASE_URL`, `ILMU_MODEL` | api | optional (provider disabled if key missing) | – |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | api | optional (provider disabled if key missing) | model `claude-sonnet-4-5` |
+| `LLM_PROVIDER` | api | optional (invalid value warns and uses the default) | `bedrock` (or `openai_compatible`) |
+| `LLM_PRIMARY_MODEL`, `LLM_PRIMARY_VISION` | api | optional (blank model disables the primary) | `openai.gpt-oss-120b-1:0`, `false` |
+| `LLM_FALLBACK_MODEL`, `LLM_FALLBACK_VISION` | api | optional (blank model disables the fallback) | `global.anthropic.claude-sonnet-4-5-20250929-v1:0`, `true` |
+| `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | api (bedrock) | optional (LLM disabled if region or credentials are missing; keys may come from a profile or IAM role instead) | – |
+| `LLM_BASE_URL`, `LLM_API_KEY` | api (openai_compatible) | optional (LLM disabled if missing) | – |
 | `OCR_ENGINE` | api | optional | `paddleocr` \| `tesseract`, default `paddleocr` |
 | `EMBEDDING_PROVIDER` | api | optional | `hash` \| `api`, default `hash` |
 | `EMBEDDING_API_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` | api | required only when `EMBEDDING_PROVIDER=api` (provider disabled, `hash` used, if missing) | 384-dim output required |
@@ -851,7 +854,7 @@ Each property is implemented as a property-based test (Hypothesis for Python, fa
 
 16. **Vision geometry.** For all synthetic skewed table images (angles −45..45), every output `BoundingBox` lies fully inside the original image with width and height ≥ 1, rows are ordered top to bottom with numbers from 1, cells ordered left to right, and `smudged` equals `confidence < 0.6`. *Validates: 4.4, 4.5, 4.11, 4.12.*
 
-17. **Router ordering.** For all combinations of ILMU and Claude outcomes (ok, HTTP error, timeout, invalid structure), ILMU is tried first; Claude is tried only after an ILMU failure, exactly once, with a fallback event emitted before the Claude request; a double failure raises `ProviderFailure` naming both providers and reasons; and no credential string appears in any raised message, event or log. *Validates: 8.1–8.4, 8.6, 8.7.*
+17. **Router ordering.** For both transports, all combinations of primary and fallback outcomes (ok, HTTP error, timeout, invalid structure), with and without an image, and with a vision-capable or text-only primary: the primary is tried first whenever it can accept the request; the fallback is tried only after a primary failure, exactly once, with a fallback event emitted before the fallback request; an image request to a text-only primary goes only to the fallback with no fallback event; a double failure raises `ProviderFailure` naming both roles and reasons; Bedrock requests are SigV4-signed Converse calls; and no credential or response-body string appears in any raised message, event or log. *Validates: 8.1–8.4, 8.6–8.9.*
 
 18. **Log hygiene.** For all pipeline runs with canary strings embedded in file content, OCR text and credentials, no log record at any level contains a canary. *Validates: 17.11, 8.6.*
 
@@ -884,7 +887,7 @@ All API errors use `ErrorResponse`. A FastAPI `RequestValidationError` handler c
 | `rot_detector` | No provider | yes | `semantic_checks = skipped` | `info` |
 | `rot_detector` | Router failure / > 60 s | yes | deterministic and ML anomalies kept; `semantic_skip_reason`, `error` | `warning` |
 | `rot_detector` | Row-subset invariant broken by deterministic code | fatal | node `failed (internal_error)` | `error` |
-| LLM router | ILMU fails | yes | Claude tried; `fallback` event | `warning` |
+| LLM router | Primary model fails | yes | Fallback model tried; `fallback` event | `warning` |
 | LLM router | Both fail | caller decides | `ProviderFailure` listing both providers and reasons | `warning` |
 | LLM router | Provider key missing | yes | provider disabled | `error` once at start, names the variable |
 | Indexing | DB unreachable / > 120 s | yes | `indexing.status = failed` with reason in the `api_resurrector` payload; generation continues | `warning` |
@@ -977,7 +980,7 @@ The 18 properties above, in `apps/api/tests/property/` (Hypothesis, `max_example
 
 ### Integration tests
 
-- **api**: FastAPI `TestClient` with `fakeredis`, a pgvector Postgres service container in CI, and `respx`-stubbed ILMU and Claude. Scenarios: each Preset end to end with the full event sequence; text session first event is `vision_extractor skipped text_input`; image session with a generated skewed table; cache hit replays identical events; SSE reconnect with `Last-Event-ID`; a failing node ends the stream with `error` then `terminal`; indexing failure still generates code; search before indexing returns 409; the "missing branch codes" query on the F&B preset returns only empty-branch records; Redis down still completes a session; process-pool timeouts (patched to short limits) recycle the pool.
+- **api**: FastAPI `TestClient` with `fakeredis`, a pgvector Postgres service container in CI, and `respx`-stubbed Bedrock Converse endpoints for the primary and fallback models (static test credentials; no real AWS calls). Scenarios: each Preset end to end with the full event sequence; text session first event is `vision_extractor skipped text_input`; image session with a generated skewed table; cache hit replays identical events; SSE reconnect with `Last-Event-ID`; a failing node ends the stream with `error` then `terminal`; indexing failure still generates code; search before indexing returns 409; the "missing branch codes" query on the F&B preset returns only empty-branch records; Redis down still completes a session; process-pool timeouts (patched to short limits) recycle the pool.
 - **web**: component tests with the mock client; Playwright e2e against the mock (Phase 1) and later against `docker-compose` (Phase 2): upload, preset, keyboard-only flow, X-Ray toggle, drawer, reconnect (the test kills the SSE connection), WebGL-disabled mode (`--disable-gpu --disable-webgl`).
 - **Contract**: a CI step dumps `app.openapi()`, converts the schemas to TypeScript with `json-schema-to-typescript`, and a `tsc` file asserts mutual assignability with `types/autopsy.ts` for every shared type, which verifies 19.9 (identical types before and after replacing Mock_Data). The mock event stream and a recorded real stream are both validated against the Pydantic `SessionEvent` models.
 - **Performance** (CI-gated where deterministic, otherwise reported): `ml_rot_scorer` 50,000 rows < 10 s; cached first byte < 300 ms for a 10 MB payload; X-Ray 10,000 boxes < 1 s; Autopsy_Table 50 nodes + 5,000 points ≥ 30 fps (Playwright with a frame counter, run on the reference runner, reported rather than gating because shared CI GPUs vary); vector search 50,000 rows < 2 s; the Docker image size gate.
@@ -998,4 +1001,4 @@ Jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `ap
 - **Image size.** PaddlePaddle CPU plus OpenCV and scikit-learn may approach 1.2 GB (the default hash embedding adds no model weights). The image gate runs from the first API commit. If it fails, the fallback is to move PaddleOCR into an optional extra and default `OCR_ENGINE` to `tesseract` in the Docker image (the requirements allow both values).
 - **Indexing time.** The default hash provider embeds 50,000 records in well under the 10 s of 6.9 and indexing then only upserts vectors. For the optional `api` provider, 50,000 records in 120 s needs roughly 420 embeddings/s; if it misses, the mitigation is a smaller `max_length` for record text, not a larger timeout. The embedding matrix (about 77 MB at 50,000 rows) stays in memory until `api_resurrector` ends.
 - **OCR speed.** Per-cell OCR on large grids may exceed 45 s; this is by design routed to the vision-LLM fallback, and the benchmark records how often.
-- **ILMU contract** (assumption 1) must be confirmed before Phase 2 starts.
+- **Bedrock model access.** Both model identifiers must be enabled for the AWS account in `AWS_REGION` before Phase 2 starts; on-demand quotas are per account and region, and throttling (HTTP 429) is treated as a primary error that falls back.

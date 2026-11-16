@@ -11,7 +11,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 - [x] 1. Repository scaffolding
   - [x] 1.1 Create the monorepo skeleton
     - Add `pnpm-workspace.yaml` (`apps/web`, `packages/mcp-server`), root `package.json`, `tsconfig.base.json` (strict), and empty-but-tracked directories via placeholder files for `apps/api`, `packages/mcp-server`, `sample-dumps`
-    - Add `.env.example` listing every variable from the design's configuration table (`WEB_ORIGIN`, `REDIS_URL`, `SUPABASE_DB_URL`, `ILMU_API_KEY`, `ILMU_BASE_URL`, `ILMU_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `OCR_ENGINE`, `CACHE_TTL_SECONDS`, `SANITIZER_MAX_CHARS`, `MAX_CONCURRENT_SESSIONS`, `API_TOKEN`, `LOG_LEVEL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_USE_MOCK`, `NECRO_API_URL`, `NECRO_API_TOKEN`) with empty values
+    - Add `.env.example` listing every variable from the design's configuration table (`WEB_ORIGIN`, `REDIS_URL`, `SUPABASE_DB_URL`, `LLM_PROVIDER`, `LLM_PRIMARY_MODEL`, `LLM_PRIMARY_VISION`, `LLM_FALLBACK_MODEL`, `LLM_FALLBACK_VISION`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `LLM_BASE_URL`, `LLM_API_KEY`, `OCR_ENGINE`, `CACHE_TTL_SECONDS`, `SANITIZER_MAX_CHARS`, `MAX_CONCURRENT_SESSIONS`, `API_TOKEN`, `LOG_LEVEL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_USE_MOCK`, `NECRO_API_URL`, `NECRO_API_TOKEN`) with empty values
     - Verify the existing `.gitignore` ignores `.env` but no pattern matches anything under `.kiro/`
     - _Requirements: 19.1, 19.5, 17.7, 17.10_
   - [x] 1.2 Write the seeded preset generator
@@ -228,12 +228,12 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 
 - [x] 15. LLM router
   - [x] 15.1 Implement `core/llm.py`
-    - `LLMRequest`, `LLMResult`, `ProviderFailure`/`ProviderAttempt`, `LLMRouter.has_provider()` and `complete()`: ILMU first (OpenAI-compatible `chat/completions` with `image_url` data URIs, 30 s `httpx` timeout), on error, timeout or structured-output failure emit the fallback event through the `EventSink` then call Claude immediately (Anthropic Messages API, 30 s), no retries, double failure raises `ProviderFailure` naming both providers and reasons with no credential or body content; disabled providers (missing key) skipped with a configuration error naming the variable; provider recorded on results; image requests follow the same order
-    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 4.9_
+    - `LLMRequest`, `LLMResult`, `ProviderFailure`/`ProviderAttempt`, `LLMRouter.has_provider()` and `complete()`: primary model first (default Amazon Bedrock Converse API with `openai.gpt-oss-120b-1:0`, SigV4 via `botocore` over async `httpx`, 30 s timeout; `LLM_PROVIDER=openai_compatible` uses `chat/completions` with `image_url` data URIs), on error, timeout or structured-output failure emit the fallback event through the `EventSink` then call the fallback model immediately (default Claude Sonnet 4.5 on Bedrock, 30 s), no retries, double failure raises `ProviderFailure` naming both roles and reasons with no credential or body content; disabled models (missing region, credentials or model id) skipped with a configuration error naming the variable; role (`primary`/`fallback`) recorded on results; image requests skip a text-only primary without a fallback event
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 4.9_
   - [x] 15.2 Write property test for router ordering
     - **Property 17: Router ordering**
-    - Over all ILMU/Claude outcome combinations (ok, HTTP error, timeout, invalid structure) with `respx`: ILMU first, Claude at most once and only after an ILMU failure with the fallback event emitted before the Claude request, double failure names both providers, no credential string appears in messages, events or logs
-    - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.6, 8.7**
+    - Over both transports and all primary/fallback outcome combinations (ok, HTTP error, timeout, invalid structure), with and without images and a text-only or vision primary, using `respx` and static test credentials: primary first when it can accept the request, fallback at most once and only after a primary failure with the fallback event emitted before the fallback request, image requests skip a text-only primary with no fallback event, double failure names both roles, Bedrock requests are SigV4-signed Converse calls, no credential or body string appears in messages, events or logs
+    - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.6, 8.7, 8.8, 8.9**
 
 - [x] 16. Vision services
   - [x] 16.1 Implement `services/vision.py` (process-pool safe, pure)
@@ -343,7 +343,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Over pipeline outputs on generated datasets and stubbed vision results, every Confidence_Score (types, keys, anomalies, OCR cells, defects, encoding, search similarity) lies in [0, 1] with at most 2 decimals where specified, and the models reject out-of-range values; Spatial_Coordinates from both coordinate sources stay finite in [-1, 1], and `MlResult` validates with and without the optional `coordinate_source` fields
     - **Validates: Requirements 2.2, 4.11, 5.4, 6.14, 6.26, 7.5, 14.5**
   - [ ] 21.8 Write integration tests for the pipeline
-    - Run each Preset through the graph with stubbed ILMU/Claude (`respx`), `fakeredis` and a fake vector store; assert event order, text session first event `vision_extractor skipped text_input`, image session with a generated skewed table, a failing node ends with `error` then `terminal`, indexing failure still generates code, an embedding provider failure yields `coordinate_source = "numeric"` in the `ml_rot_scorer` event while the run completes, process-pool timeouts (patched short) recycle the pool, and extend Property 18 over a full run
+    - Run each Preset through the graph with stubbed Bedrock primary and fallback models (`respx`, no real AWS calls), `fakeredis` and a fake vector store; assert event order, text session first event `vision_extractor skipped text_input`, image session with a generated skewed table, a failing node ends with `error` then `terminal`, indexing failure still generates code, an embedding provider failure yields `coordinate_source = "numeric"` in the `ml_rot_scorer` event while the run completes, process-pool timeouts (patched short) recycle the pool, and extend Property 18 over a full run
     - _Requirements: 4.2, 5.1, 6.8, 9.2, 10.5, 10.11, 14.2, 17.11_
 
 - [ ] 22. Sessions, routes, presets and app wiring
@@ -467,4 +467,4 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 - Each property-test sub-task carries one Correctness Property from design.md (1 to 20), placed right after the code it tests. Properties 6 and 18 are first written where their code is introduced and extended once the full pipeline exists (tasks 21.7 and 21.8).
 - Task order follows Requirement 19.8: web with Mock_Data, then API with SSE, then MCP.
 - The design defines no steering files or hooks, so none are planned. Deployment and production performance measurement are out of scope; performance checks appear only as automated tests.
-- Open design assumption: ILMU is assumed to expose an OpenAI-compatible `chat/completions` endpoint. Confirm it before task 15.1; only `core/llm.py` changes if it is wrong.
+- LLM provider: Amazon Bedrock (open-weight `openai.gpt-oss-120b-1:0` primary, Claude on Bedrock fallback). Enable both models for the AWS account and region before Phase 2; `LLM_PROVIDER=openai_compatible` switches to any OpenAI-compatible endpoint by configuration only.
