@@ -13,6 +13,8 @@ test("X-Ray overlay with 10,000 boxes shows within 1 s of toggling on", async ({
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   const svg = page.locator('section[aria-label="Vision X-Ray"] svg[role="img"]');
   await expect(svg.locator("rect")).not.toHaveCount(0);
+  // Measure the toggle, not dev-server compilation and hydration still running after load.
+  await page.waitForLoadState("networkidle");
 
   const elapsedMs = await page.evaluate(async () => {
     const button = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Vision X-Ray");

@@ -212,16 +212,16 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Equal results on identical bytes, confidence in [0, 1], strictly ascending boundaries with at most 100 entries, preview of `min(50, n)` records, failed records excluded and reported with 1-based lines
     - **Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.7, 2.10**
 
-- [ ] 14. Copybook parser
-  - [ ] 14.1 Implement `copybook.py`
+- [x] 14. Copybook parser
+  - [x] 14.1 Implement `copybook.py`
     - Tokenizer plus recursive-descent parser for fixed and free format; levels 01–49, 66, 77, 88; names 1–30 chars; PIC (canonical form), USAGE (DISPLAY, COMP, COMPUTATIONAL, BINARY, COMP-3, PACKED-DECIMAL, COMP-1, COMP-2, COMP-5), OCCURS 1–9,999, REDEFINES; storage sizes per the design, zero-based offsets, group lengths, record length excluding redefining fields; `print_copybook`
     - `CopybookError(line, text)` for unsupported constructs with no partial layout, and the no-layout error for empty input (code `copybook_no_layout`)
     - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.7, 3.8_
-  - [ ] 14.2 Write property test for the copybook round trip
+  - [x] 14.2 Write property test for the copybook round trip
     - **Property 3: Copybook round trip**
     - `parse_copybook(print_copybook(L)) == L` including offsets and lengths; REDEFINES offset equals target offset; record length equals sum of non-redefining lengths
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.8, 3.9**
-  - [ ] 14.3 Write property test for atomic copybook failure
+  - [x] 14.3 Write property test for atomic copybook failure
     - **Property 4: Copybook failure is atomic**
     - Inputs with an unsupported construct raise `CopybookError` with the right 1-based line and construct text and return no layout; empty input raises the no-layout error
     - **Validates: Requirements 3.6, 3.7**
