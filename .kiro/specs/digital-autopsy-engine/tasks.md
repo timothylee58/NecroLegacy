@@ -8,19 +8,19 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 
 ### Phase 1: Repository scaffolding and web app on Mock_Data
 
-- [ ] 1. Repository scaffolding
-  - [~] 1.1 Create the monorepo skeleton
+- [x] 1. Repository scaffolding
+  - [x] 1.1 Create the monorepo skeleton
     - Add `pnpm-workspace.yaml` (`apps/web`, `packages/mcp-server`), root `package.json`, `tsconfig.base.json` (strict), and empty-but-tracked directories via placeholder files for `apps/api`, `packages/mcp-server`, `sample-dumps`
     - Add `.env.example` listing every variable from the design's configuration table (`WEB_ORIGIN`, `REDIS_URL`, `SUPABASE_DB_URL`, `ILMU_API_KEY`, `ILMU_BASE_URL`, `ILMU_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `OCR_ENGINE`, `CACHE_TTL_SECONDS`, `SANITIZER_MAX_CHARS`, `MAX_CONCURRENT_SESSIONS`, `API_TOKEN`, `LOG_LEVEL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_USE_MOCK`, `NECRO_API_URL`, `NECRO_API_TOKEN`) with empty values
     - Verify the existing `.gitignore` ignores `.env` but no pattern matches anything under `.kiro/`
     - _Requirements: 19.1, 19.5, 17.7, 17.10_
-  - [~] 1.2 Write the seeded preset generator
+  - [x] 1.2 Write the seeded preset generator
     - Create `scripts/generate_presets.py` (fixed seed, Pillow as dev-only dependency) that writes `sample-dumps/1994_mainframe_ledger_dump.dat`, `sample-dumps/corrupted_fnb_warehouse_pos_batch.txt` (multi-record-type, 2-char prefix, cross-entity foreign keys, orphan FKs, negative stock, empty branch codes) and `sample-dumps/faded_dotmatrix_manifest.png`
     - The PNG is at least 1,000 px wide, at most 10 MB, has a table of at least 5 rows by 3 columns with a smudged digit, a torn total and a misaligned column, and carries no EXIF or text chunks
     - All data is synthetic with no real names, emails, phones, government IDs, account or card numbers
     - Run the generator and commit the three outputs
     - _Requirements: 19.2, 19.3, 19.10, 4.13_
-  - [~] 1.3 Scaffold `apps/web`
+  - [x] 1.3 Scaffold `apps/web`
     - Create the Next.js 15 App Router app with React 19, TypeScript `strict`, Tailwind, shadcn/ui (button, dialog, sheet, toggle, radio-group), Framer Motion, Three.js, Vitest + Testing Library + fast-check, Playwright + `@axe-core/playwright`
     - Create `src/app/{layout.tsx,page.tsx,globals.css}` with a global `focus-visible` outline of at least 2 px
     - `next.config.ts` throws naming `NEXT_PUBLIC_API_URL` when it is missing and `NEXT_PUBLIC_USE_MOCK` is not `"true"`
@@ -28,11 +28,11 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 19.1, 17.8, 17.9, 18.2_
 
 - [ ] 2. Web types, mock data and client abstraction
-  - [~] 2.1 Define the wire types
+  - [-] 2.1 Define the wire types
     - Create `apps/web/src/types/autopsy.ts` with every type from the design's TypeScript section (`NodeName`, `Severity`, `BoundingBox`, `VisionCell`, `VisionDefect`, `VisionResult`, `SchemaField`, `Entity`, `Anomaly`, `SpatialPoint`, `SessionEvent` union, `SchemaPayload`, `MlResult`, `RotResult`, `ResurrectionResult`, `SearchResponse`, `CreateSessionResponse`, `ErrorResponse`, `PresetId`)
     - Keys are snake_case to match the API wire format
     - _Requirements: 19.9, 10.2, 10.3, 11.13, 12.12_
-  - [~] 2.2 Implement upload validation
+  - [-] 2.2 Implement upload validation
     - Create `src/lib/file-validation.ts` exporting the shared limits (text 5,242,880, image 10,485,760), a case-insensitive extension check for the seven extensions, a `>` size comparison so the exact limit passes, and an image signature check reading the first 8 bytes with `file.slice(0, 8).arrayBuffer()`
     - Return typed rejection reasons that carry the alert text (seven extensions, 5 MB limit, 10 MB image limit)
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.8_
@@ -73,7 +73,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 1.2, 1.4, 1.9, 1.10, 1.13_
 
 - [ ] 4. Autopsy_Table 3D scene
-  - [~] 4.1 Implement scene helpers
+  - [-] 4.1 Implement scene helpers
     - Create `src/lib/scene/layout.ts` (seeded `mulberry32(hash(entityNames))` force layout, 200 iterations, sphere radius 6), `palette.ts` (crimson `#DC143C`, slate `#94A3B8`), and `webgl.ts` (throwaway-canvas probe for `webgl2` then `webgl`)
     - _Requirements: 11.1, 11.5, 11.7, 11.11_
   - [~] 4.2 Write unit tests for layout determinism
@@ -93,7 +93,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 11.11, 11.14, 11.10, 18.8_
 
 - [ ] 5. Entity list, summary, announcer and progress
-  - [~] 5.1 Implement accessibility helpers
+  - [-] 5.1 Implement accessibility helpers
     - Create `src/lib/a11y/summary.ts` (per-entity name, counts of low/medium/critical including zeros, related entity names; announcement helper capped at 250 characters) and `src/lib/a11y/contrast.ts` (WCAG ratio helper)
     - _Requirements: 18.3, 18.4, 18.7_
   - [~] 5.2 Build `EntityList`, `AutopsySummary`, `LiveAnnouncer`, `ProgressRail`

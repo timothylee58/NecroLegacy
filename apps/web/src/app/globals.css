@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 20% 6%;
+    --foreground: 210 20% 96%;
+    --muted: 222 14% 16%;
+    --muted-foreground: 215 16% 72%;
+    --primary: 210 20% 96%;
+    --primary-foreground: 222 20% 8%;
+    --accent: 222 14% 20%;
+    --accent-foreground: 210 20% 96%;
+    --border: 222 14% 26%;
+    --ring: 190 90% 60%;
+    --popover: 222 20% 9%;
+    --popover-foreground: 210 20% 96%;
+    --crimson: 348 83% 55%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
