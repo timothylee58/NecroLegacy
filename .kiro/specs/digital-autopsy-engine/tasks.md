@@ -226,11 +226,11 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Inputs with an unsupported construct raise `CopybookError` with the right 1-based line and construct text and return no layout; empty input raises the no-layout error
     - **Validates: Requirements 3.6, 3.7**
 
-- [ ] 15. LLM router
-  - [ ] 15.1 Implement `core/llm.py`
+- [x] 15. LLM router
+  - [x] 15.1 Implement `core/llm.py`
     - `LLMRequest`, `LLMResult`, `ProviderFailure`/`ProviderAttempt`, `LLMRouter.has_provider()` and `complete()`: ILMU first (OpenAI-compatible `chat/completions` with `image_url` data URIs, 30 s `httpx` timeout), on error, timeout or structured-output failure emit the fallback event through the `EventSink` then call Claude immediately (Anthropic Messages API, 30 s), no retries, double failure raises `ProviderFailure` naming both providers and reasons with no credential or body content; disabled providers (missing key) skipped with a configuration error naming the variable; provider recorded on results; image requests follow the same order
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 4.9_
-  - [ ] 15.2 Write property test for router ordering
+  - [x] 15.2 Write property test for router ordering
     - **Property 17: Router ordering**
     - Over all ILMU/Claude outcome combinations (ok, HTTP error, timeout, invalid structure) with `respx`: ILMU first, Claude at most once and only after an ILMU failure with the fallback event emitted before the Claude request, double failure names both providers, no credential string appears in messages, events or logs
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.6, 8.7**
