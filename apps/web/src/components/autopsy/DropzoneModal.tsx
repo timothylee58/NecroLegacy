@@ -130,7 +130,7 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
         <div
           role="button"
           tabIndex={0}
-          aria-label="Upload files. Accepted extensions: .dat, .txt, .csv, .cpy, .png, .jpg, .jpeg. Press Enter or Space to choose files."
+          aria-label="Drop files here or press Enter to browse. Accepted extensions: .dat, .txt, .csv, .cpy, .png, .jpg, .jpeg."
           onClick={openPicker}
           onKeyDown={onZoneKey}
           onDragOver={(e) => e.preventDefault()}

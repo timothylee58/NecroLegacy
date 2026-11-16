@@ -4,7 +4,7 @@
 
 NecroLegacy is a greenfield monorepo (the repository currently holds only `.gitignore`, `LICENSE` and `.kiro/`). It takes a legacy text dump, a COBOL copybook, or a scanned/photographed table, runs a five-node LangGraph pipeline, and presents the result in a Three.js "Autopsy Table", a Vision X-Ray image overlay, and a Kiro MCP server.
 
-The five nodes run in a fixed order: `vision_extractor` (images only), `schema_archaeologist`, `ml_rot_scorer`, `rot_detector`, `api_resurrector`. Anything that can be computed deterministically is computed without an LLM: parsing, type inference, key inference, the six rule-based rot checks, IsolationForest scoring, PCA coordinates and code generation. LLMs are used only for (a) the vision-LLM table extraction fallback, (b) explaining the top ML outliers and referential breaks, and (c) a "silent corruption" sweep. Every LLM call goes through one router (ILMU first, Claude on failure within 3 seconds) and one sanitizer.
+The five nodes run in a fixed order: `vision_extractor` (images only), `schema_archaeologist`, `ml_rot_scorer`, `rot_detector`, `api_resurrector`. Anything that can be computed deterministically is computed without an LLM: parsing, type inference, key inference, the six rule-based rot checks, IsolationForest scoring, PCA coordinates over record embeddings and code generation. LLMs are used only for (a) the vision-LLM table extraction fallback, (b) explaining the top ML outliers and referential breaks, and (c) a "silent corruption" sweep. Every LLM call goes through one router (ILMU first, Claude on failure within 3 seconds) and one sanitizer.
 
 Delivery order is fixed by Requirement 19.8: **Phase 1** web app on typed mock data (including Vision X-Ray and spatial points), **Phase 2** FastAPI service with SSE, cache and vector search, **Phase 3** MCP server. To make Phase 2 a drop-in replacement, the web app talks to an `AutopsyClient` interface with two implementations (mock and HTTP) that emit the identical `SessionEvent` stream.
 
@@ -14,13 +14,14 @@ Delivery order is fixed by Requirement 19.8: **Phase 1** web app on typed mock d
 |---|---|
 | Monorepo | pnpm workspaces (`apps/web`, `packages/mcp-server`); Python project in `apps/api` with `pyproject.toml` + pinned `requirements.txt` |
 | Web | Next.js 15 App Router, React 19 function components, TypeScript `strict`, Tailwind, shadcn/ui (Radix), Framer Motion, Three.js, Vitest + Testing Library + fast-check, Playwright + `@axe-core/playwright` |
-| API | Python 3.12, FastAPI, Pydantic v2 + pydantic-settings, LangGraph `StateGraph`, httpx (LLM calls), `redis.asyncio`, `psycopg[binary,pool]` 3 + `pgvector`, `fastembed` (ONNX embeddings), `opencv-python-headless`, `numpy`, `scikit-learn`, PaddleOCR (CPU) + Tesseract, Jinja2 (codegen), pytest, pytest-asyncio, Hypothesis, respx, fakeredis |
+| API | Python 3.12, FastAPI, Pydantic v2 + pydantic-settings, LangGraph `StateGraph`, httpx (LLM calls), `redis.asyncio`, `psycopg[binary,pool]` 3 + `pgvector`, `opencv-python-headless`, `numpy`, `scikit-learn`, PaddleOCR (CPU) + Tesseract, Jinja2 (codegen), pytest, pytest-asyncio, Hypothesis, respx, fakeredis |
 | MCP | TypeScript on Node 20, `@modelcontextprotocol/sdk` (stdio transport), `ajv` for input validation, Vitest + fast-check |
 | Infra | Vercel (web), Railway (api, root `Dockerfile`), Supabase Postgres + pgvector, Redis (Railway plugin), GitHub Actions |
 
 Decisions that were open and are now closed:
 
-- **Embeddings**: `fastembed` with `BAAI/bge-small-en-v1.5` (384 dims, ONNX, no PyTorch, consistent with 4.20/6.19). Rejected: ILMU/Claude embedding endpoints (not known to exist, adds a vendor dependency to search) and `sentence-transformers` (pulls PyTorch). The model weights are downloaded at image build time so cold starts need no network.
+- **Embeddings**: one `EmbeddingProvider` abstraction (`services/embeddings.py`). The default `hash` provider is a deterministic feature-hashed embedding of the record field values (384 dims, L2-normalized, `numpy` only, no model weights, no GPU, no PyTorch, nothing added to the Docker image). An optional `api` provider calls a configured embedding endpoint (`EMBEDDING_API_URL`) and is never routed through `core/llm.py`. Rejected: `fastembed`/`BAAI/bge-small-en-v1.5` as the default (ships ONNX model weights and a build-time download, which the user replaced with the weight-free local default) and `sentence-transformers` (pulls PyTorch). The trade-off is that hashed vectors capture lexical overlap and field-value structure, not paraphrase semantics; missing-field search stays exact through `empty_fields` (14.6), and the `api` provider is the upgrade path for semantic quality. The vector size stays 384 so the `vector(384)` column is the same for both providers.
+- **Coordinates**: PCA over the record embeddings (user decision: PCA, not UMAP, so coordinates are deterministic and cheap). IsolationForest stays on the numeric columns (`contamination="auto"`, `random_state=42`, outlier iff `decision_function < -0.15`).
 - **Vector search**: exact cosine scan filtered by a btree index on `session_key`, no ANN index. 50,000 vectors of 384 floats is a few tens of milliseconds, and an HNSW index would post-filter by session and return too few rows.
 - **Session state**: in-process `SessionStore` (single Railway replica, documented). Redis stores only the completed-session event log used for caching. Rejected: Redis-backed live sessions (adds a second failure mode to every event, and 15.6 requires the pipeline to work with Redis down).
 - **SSE client**: a `fetch` + `ReadableStream` parser, not `EventSource`, because 10.7 requires exactly 5 attempts with 1→16 s backoff and `EventSource` controls its own retry policy.
@@ -181,7 +182,7 @@ apps/api/
   app/core/{config.py,llm.py,logging.py,errors.py}
   app/agents/{state.py,graph.py}
   app/agents/nodes/{vision_extractor.py,archaeologist.py,ml_rot_scorer.py,rot_detector.py,resurrector.py}
-  app/services/{parser.py,copybook.py,sanitizer.py,vision.py,ml.py,codegen.py,cache.py,vector_store.py,sessions.py,presets.py,file_checks.py}
+  app/services/{parser.py,copybook.py,sanitizer.py,vision.py,embeddings.py,ml.py,codegen.py,cache.py,vector_store.py,sessions.py,presets.py,file_checks.py}
   app/routes/{sessions.py,search.py,presets.py,health.py}
   app/schemas/autopsy.py
   tests/{unit,property,integration,contract}/
@@ -348,6 +349,7 @@ class AutopsyState(TypedDict, total=False):
     vision: VisionResult | None
     dataset: Dataset | None                         # entity -> rows, built by archaeologist
     schema: SchemaResult | None
+    embeddings: RecordEmbeddings | None             # internal only, never on the wire or in the cache; set by ml_rot_scorer, reused by api_resurrector
     ml: MlResult | None
     rot: RotResult | None
     resurrection: ResurrectionResult | None
@@ -361,9 +363,9 @@ class AutopsyState(TypedDict, total=False):
 |---|---|---|---|---|
 | `vision_extractor` | image bytes | `VisionResult` | local 45 s (process pool), node 120 s | `failed` with `unreadable_image`, `no_table_detected`, `cell_limit_exceeded`, `vision_timeout` |
 | `schema_archaeologist` | `ParseResult` / `VisionResult` / layouts | `SchemaResult`, `RawPreview` (text only) | 60 s | `failed` with `copybook_error`, `no_records`, `schema_validation_failed` |
-| `ml_rot_scorer` | `Dataset`, `SchemaResult` | `MlResult` | 30 s (process pool) | never fails; `skipped` with reasons |
+| `ml_rot_scorer` | `Dataset`, `SchemaResult` | `MlResult` (+ internal `RecordEmbeddings` in state) | 30 s (process pool); API embedding call 20 s inside it | never fails; `skipped` with reasons; embedding failure degrades to numeric coordinates |
 | `rot_detector` | all of the above | `RotResult` | deterministic 30 s, semantic 60 s | `failed` only on an internal bug |
-| `api_resurrector` | `SchemaResult`, `RotResult`, `Dataset` | `ResurrectionResult` | indexing 120 s, generation 30 s | `failed` with `syntax_error` |
+| `api_resurrector` | `SchemaResult`, `RotResult`, `Dataset`, `RecordEmbeddings` | `ResurrectionResult` | indexing 120 s, generation 30 s | `failed` with `syntax_error` |
 
 **`vision_extractor`** (`services/vision.py` holds the pure OpenCV steps and runs in the process pool):
 
@@ -390,7 +392,14 @@ class AutopsyState(TypedDict, total=False):
 - *LLM assist* (optional, skipped silently if no provider): the router is asked to propose human-readable entity names and corrections to roles for the top ambiguous columns. The result is validated against the pydantic `SchemaResult`; invalid fields are discarded and the deterministic value is kept. The node never depends on the LLM to complete.
 - The final `SchemaResult` is validated with Pydantic; failure marks the node failed with `schema_validation_failed`, an error listing each invalid field, and discards the output (5.7).
 
-**`ml_rot_scorer`** (`services/ml.py`, process pool): per entity, numeric columns are fields typed `integer` or `decimal`; unparsable or empty values are replaced by the column median; all-identical columns are dropped. Features = numeric columns plus `byte_len_variance = (row_utf8_bytes − mean_row_bytes)²`. Skips: fewer than 20 rows → `insufficient_rows`; no numeric column (the variance feature alone does not count) → `no_numeric_columns`; all feature columns constant → `constant_features`. Scoring: `IsolationForest(contamination="auto", random_state=42).fit(X).decision_function(X)`, rounded to 6 dp; outlier iff `score < -0.15`. PCA: `StandardScaler`, then `PCA(n_components=min(3, n_nonconstant_dims), svd_solver="full", random_state=42)`; missing components are padded with 0.0; each axis is divided by its max absolute value (an all-zero axis stays 0.0); rounding to 6 dp. `PCA` sign is made deterministic by flipping each component so its largest-magnitude loading is positive (scikit-learn's `svd_flip` already does this for the full solver; the test pins it). One `statistical_outlier` Anomaly is produced per entity with ≥ 1 flagged row: `field` is the numeric column with the highest mean absolute z-score over the flagged rows, `affected_rows` are the flagged row numbers, and `outlier_scores` maps each row to its score. If every entity is skipped the node emits `skipped` with the reasons. A scikit-learn exception emits `skipped(reason="scoring_error")` and a timeout (pool recycled) emits `skipped(reason="timeout")`; both discard partial results. The completion payload carries the anomalies, `skipped_entities`, and at most 5,000 points: all flagged rows first, then unflagged rows at stride `ceil(n_unflagged / (5000 − n_flagged))` in ascending row order (if flagged rows alone reach 5,000, the first 5,000 by ascending score are kept). The node has no import path to `core/llm.py` (enforced by an import-linter rule in CI) to satisfy 6.17.
+**`ml_rot_scorer`** (`services/ml.py`, process pool): per entity, numeric columns are fields typed `integer` or `decimal`; unparsable or empty values are replaced by the column median; all-identical columns are dropped. Features = numeric columns plus `byte_len_variance = (row_utf8_bytes − mean_row_bytes)²`. Skips: fewer than 20 rows → `insufficient_rows`; no numeric column (the variance feature alone does not count) → `no_numeric_columns`; all feature columns constant → `constant_features`. Order of work:
+
+1. *Embed* (`services/embeddings.py`): for every record of every entity, including entities skipped in the next steps, the record text of the vector-store section is embedded with the configured `EmbeddingProvider` into a 384-float vector, kept as one `float32` matrix per entity. The node stores them in `AutopsyState.embeddings` (about 77 MB at 50,000 rows; held in memory only and returned from the process pool as numpy arrays, never serialized to the wire or the cache). No Supabase call is made here (6.25).
+2. *Score*: `IsolationForest(contamination="auto", random_state=42).fit(X).decision_function(X)` on the numeric feature matrix, rounded to 6 dp; outlier iff `score < -0.15`. Unchanged.
+3. *Project*: `PCA(n_components=3, svd_solver="full", random_state=42)` over the embedding matrix of the entity, with columns that are constant across the entity dropped first and no standardization (hashed, L2-normalized vectors are already on one scale; standardizing would inflate rare hash buckets). `n_components = min(3, n_nonconstant_dims, n_rows)`; missing components are padded with 0.0; each axis is divided by its max absolute value (an all-zero axis stays 0.0); rounding to 6 dp. `svd_solver="full"` is exact LAPACK SVD, so it does not depend on random initialisation (`random_state` is pinned anyway), and the sign is fixed by flipping each component so its largest-magnitude loading is positive (scikit-learn's `svd_flip` does this for the full solver; the test pins it). `float64` is used for the PCA input so results do not depend on BLAS threading order at 6 dp.
+4. *Numeric fallback*: if the embedding step raises, exceeds its deadline (20 s for the `api` provider), returns a vector that is not 384 finite floats, or an entity's embedding matrix has no non-constant dimension, the entity's coordinates come from the previous behaviour: `StandardScaler` over the numeric feature matrix, then `PCA(n_components=min(3, n_nonconstant_dims), svd_solver="full", random_state=42)`, padding, max-abs normalization and rounding exactly as above. Embedding failure is never a `skipped` reason and never fails the node. The completion payload carries `coordinate_source` (`"embedding"` only when every scored entity used embeddings, else `"numeric"`) and, for `"numeric"`, `embedding_fallback_reason` (`"provider_error"`, `"provider_timeout"`, `"invalid_embedding"` or `"degenerate_embedding"`), and the node logs one `warning`. This is how the fallback is reported through the SSE stream: it travels in the `ml_rot_scorer` `completed` event, so the SSE event types stay unchanged.
+
+One `statistical_outlier` Anomaly is produced per entity with ≥ 1 flagged row: `field` is the numeric column with the highest mean absolute z-score over the flagged rows, `affected_rows` are the flagged row numbers, and `outlier_scores` maps each row to its score. If every entity is skipped the node emits `skipped` with the reasons (the embeddings are still kept for indexing). A scikit-learn exception emits `skipped(reason="scoring_error")` and a timeout (pool recycled) emits `skipped(reason="timeout")`; both discard partial ML results and, because the same process produced them, the embeddings too; `api_resurrector` then embeds once itself. The completion payload carries the anomalies, `skipped_entities`, `coordinate_source`, `embedding_fallback_reason` and at most 5,000 points: all flagged rows first, then unflagged rows at stride `ceil(n_unflagged / (5000 − n_flagged))` in ascending row order (if flagged rows alone reach 5,000, the first 5,000 by ascending score are kept). The node has no import path to `core/llm.py` (enforced by an import-linter rule in CI) to satisfy 6.17; the `api` embedding provider uses its own `httpx` client and also cannot import `core.llm`.
 
 **`rot_detector`** runs, in order:
 
@@ -408,7 +417,7 @@ class AutopsyState(TypedDict, total=False):
 6. *Degradation*: no provider, router failure or the 60 s limit sets `semantic_checks = "skipped"` with `semantic_skip_reason`; all deterministic and ML anomalies are kept. Zero rows returns an empty list without error.
 7. A final `assert_rows_subset(anomalies, dataset)` filters any row not in the input; it is a safety net, with a violation from deterministic code logged at `error` and raised as an internal failure rather than silently repaired.
 
-**`api_resurrector`**: *indexing stage first* (`vector_store.index_session`), then generation regardless of the indexing outcome (9.2). Indexing failure is recorded as `indexing = {status: "failed", reason}` in the completion payload (14.2). Generation (`services/codegen.py`): a single Jinja2 template renders one Python file with, per entity, a Pydantic v2 model and an `APIRouter` with `POST /{entity}`, `GET /{entity}/{id}`, `GET /{entity}`, `PUT /{entity}/{id}`, `DELETE /{entity}/{id}` over an in-memory dict, followed by `app = FastAPI(); app.include_router(...)`. Because entity and field names originate in untrusted data, `codegen.safe_identifier()` is mandatory: replace non-`[0-9A-Za-z_]` with `_`, prefix `f_` if it starts with a digit, append `_` if it is a Python keyword or a `BaseModel` attribute, and de-duplicate with numeric suffixes. Class names are PascalCase of the safe identifier. Per-field output: `Annotated[<type>, Field(...)]` where `string` → `str` with `max_length=length`, `integer` → `int` with `gt=-10**length, lt=10**length`, `decimal` → `Decimal` with `max_digits=length`, `date` → `str` with a `pattern` for the detected format; every field also gets `json_schema_extra={"legacy_length": length}`, so the inferred length is machine-checkable for all types. Directly above each field, one `# {anomaly_name} ({severity})` comment per anomaly on that field. After rendering, `ast.parse(source)` is the syntax check; the source is never executed or imported. Failure sets the node failed with `{line, offset, message}`, keeps `source` in the payload for display, and emits within 2 seconds (it runs inline). With zero entities, the file contains only `app = FastAPI()`.
+**`api_resurrector`**: *indexing stage first* (`vector_store.index_session`, handed `state.embeddings` so the vectors computed by `ml_rot_scorer` are stored as they are; only records without a vector are embedded, once, through the same provider), then generation regardless of the indexing outcome (9.2). Indexing failure is recorded as `indexing = {status: "failed", reason}` in the completion payload (14.2). Generation (`services/codegen.py`): a single Jinja2 template renders one Python file with, per entity, a Pydantic v2 model and an `APIRouter` with `POST /{entity}`, `GET /{entity}/{id}`, `GET /{entity}`, `PUT /{entity}/{id}`, `DELETE /{entity}/{id}` over an in-memory dict, followed by `app = FastAPI(); app.include_router(...)`. Because entity and field names originate in untrusted data, `codegen.safe_identifier()` is mandatory: replace non-`[0-9A-Za-z_]` with `_`, prefix `f_` if it starts with a digit, append `_` if it is a Python keyword or a `BaseModel` attribute, and de-duplicate with numeric suffixes. Class names are PascalCase of the safe identifier. Per-field output: `Annotated[<type>, Field(...)]` where `string` → `str` with `max_length=length`, `integer` → `int` with `gt=-10**length, lt=10**length`, `decimal` → `Decimal` with `max_digits=length`, `date` → `str` with a `pattern` for the detected format; every field also gets `json_schema_extra={"legacy_length": length}`, so the inferred length is machine-checkable for all types. Directly above each field, one `# {anomaly_name} ({severity})` comment per anomaly on that field. After rendering, `ast.parse(source)` is the syntax check; the source is never executed or imported. Failure sets the node failed with `{line, offset, message}`, keeps `source` in the payload for display, and emits within 2 seconds (it runs inline). With zero entities, the file contains only `app = FastAPI()`.
 
 ### LLM router and sanitizer
 
@@ -475,6 +484,23 @@ Replay: `EventLog.subscribe(after_id)` snapshots `events[after_id:]` and then wa
 - Client: `redis.asyncio.from_url(REDIS_URL, socket_timeout=2, socket_connect_timeout=2)` plus `asyncio.timeout(2)` around each call. Any exception or timeout on `get` is treated as a miss and logs one `warning` ("cache unavailable", no key, no payload); on `set` it logs one `warning` and the session still completes. Nothing is written for failed or cancelled sessions (15.9).
 - A hit returns `201 {cached: true}` from `POST /api/sessions`, constructs a session whose `EventLog` is preloaded with the stored events, sets `served_from_cache = true` on the snapshot, and the SSE response carries `X-Necro-Cache: HIT`. The first response byte goes out right after one Redis `GET` plus a gzip decompress (a ≤ 10 MB payload compresses to a small fraction of that), so 300 ms at the API boundary is expected to hold. A timing test with `fakeredis` asserts it.
 
+### Embedding provider (`services/embeddings.py`)
+
+```python
+class EmbeddingProvider(Protocol):
+    name: Literal["hash", "api"]
+    dim: int                                              # always 384
+    def embed(self, texts: Sequence[str], *, deadline: float) -> np.ndarray: ...   # (n, 384) float32, L2-normalized
+
+class HashEmbeddingProvider:   # default, pure and process-pool safe
+class ApiEmbeddingProvider:    # optional, httpx POST to EMBEDDING_API_URL, batches of 256
+```
+
+- **Record text** is shared with the vector store: `"{entity} | {field}={value or '<empty>'}; …"`, values truncated to 200 characters and passed through `sanitize_cell`.
+- **`hash` provider**: tokens are the lower-cased field name and value pieces, namely `"{field}={value}"`, the value alone, its character 3-grams, and a coarse shape token (digits to `9`, letters to `a`, e.g. `99-aaa`) so rows whose layout is corrupted differ from rows whose layout is healthy. Each token is hashed with `hashlib.blake2b(digest_size=8)` (never Python's salted `hash()`), the low bits choose one of 384 buckets and one bit chooses the sign (signed feature hashing keeps unrelated tokens from cancelling in expectation). Counts are scaled with `log1p`, then the vector is L2-normalized; a record with no tokens yields the zero vector. Same text gives the same vector in every process and on every run.
+- **`api` provider**: selected by `EMBEDDING_PROVIDER=api`; requires `EMBEDDING_API_URL`, `EMBEDDING_API_KEY` and `EMBEDDING_MODEL`. A response is accepted only if it has one 384-float vector per input, all finite; vectors are L2-normalized locally. Any HTTP error, timeout (20 s) or invalid shape raises `EmbeddingError(reason)`, which `ml_rot_scorer` turns into the numeric fallback and `vector_store` turns into `indexing.status = "failed"`. A missing key at start disables the provider with a logged configuration error naming the variable and falls back to `hash`. The source text is user data, so the `api` provider is opt-in and documented in the README as sending record text to a third party.
+- **No LLM**: neither provider imports `core.llm`; embeddings are numeric inputs to the PCA, not scores (6.17, 6.22).
+
 ### Vector store (`services/vector_store.py`)
 
 Schema, applied idempotently by `ensure_schema()` in the FastAPI lifespan:
@@ -498,7 +524,7 @@ ALTER TABLE record_embeddings ENABLE ROW LEVEL SECURITY;  -- blocks PostgREST/an
 
 Connection: `SUPABASE_DB_URL` points to the session-mode pooler or direct connection (not the transaction pooler, which breaks prepared statements; `prepare_threshold=None` is set anyway). `AsyncConnectionPool(min_size=1, max_size=5, timeout=3)`.
 
-Indexing: record text is `"{entity} | {field}={value or '<empty>'}; …"` with values truncated to 200 characters. Embeddings come from `fastembed.TextEmbedding("BAAI/bge-small-en-v1.5")` in batches of 256 on a worker thread; the deadline (120 s) is checked between batches, which makes the stage cancellable without killing a thread. Rows are upserted with `INSERT … ON CONFLICT DO UPDATE` in batches of 1,000 using `executemany` with bound parameters. `empty_fields` lists fields where `value.strip() == ""`; `anomaly_flags` lists the anomaly names covering that row. A purge task deletes rows older than `CACHE_TTL_SECONDS` hourly.
+Indexing: record text is `"{entity} | {field}={value or '<empty>'}; …"` with values truncated to 200 characters. Embeddings are not computed here in the normal case: `index_session` receives the `RecordEmbeddings` produced by `ml_rot_scorer` (14.1, 6.23) and only embeds records that have no vector, in batches of 256 on a worker thread; the deadline (120 s) is checked between batches, which makes the stage cancellable without killing a thread. Record text and vectors are therefore identical between the 3D layout and the search index. `search` embeds the query with the provider recorded for the session's index (`EMBEDDING_PROVIDER` at indexing time is stored in the `SessionStore` next to `index_key`), so index and query vectors always come from the same provider (14.13). Rows are upserted with `INSERT … ON CONFLICT DO UPDATE` in batches of 1,000 using `executemany` with bound parameters. `empty_fields` lists fields where `value.strip() == ""`; `anomaly_flags` lists the anomaly names covering that row. A purge task deletes rows older than `CACHE_TTL_SECONDS` hourly.
 
 Search: the route obtains `index_key` from the session record (never from the request body). The analyzer finds missing-field intent: regex `\b(missing|empty|blank|null|without)\b\s+(.{1,40})`; the phrase is tokenized, lower-cased, and de-pluralised (`codes → code`); each field of the session's schema whose name tokens are all in the phrase tokens becomes a filter. Matched fields add `AND empty_fields @> %s`. This is what guarantees 14.6 (no non-empty branch code in the results), independent of embedding quality. The query:
 
@@ -670,6 +696,8 @@ class SkippedEntity(Wire):
 class MlResult(Wire):
     anomalies: list[Anomaly]; skipped_entities: list[SkippedEntity]
     points: list[SpatialPoint] = Field(max_length=5000)
+    coordinate_source: Literal["embedding", "numeric"] = "embedding"          # optional on the wire; omitted by older producers
+    embedding_fallback_reason: Literal["provider_error", "provider_timeout", "invalid_embedding", "degenerate_embedding"] | None = None
 
 class RotResult(Wire):
     anomalies: list[Anomaly]
@@ -740,6 +768,7 @@ export interface Anomaly {
   llm_provider?: "ilmu" | "claude" | null;
 }
 export interface SpatialPoint { entity: string; row_number: number; x: number; y: number; z: number; flagged: boolean; outlier_score: number }
+// Frozen contract: SpatialPoint is unchanged. When the API is wired (task 24), `MlResult` in `apps/web/src/types/autopsy.ts` needs the optional fields `coordinate_source?: "embedding" | "numeric"` and `embedding_fallback_reason?: "provider_error" | "provider_timeout" | "invalid_embedding" | "degenerate_embedding" | null`; no component reads them, so the built web app is unaffected.
 
 export type SessionEvent =
   | { id: number; type: "node"; node: "vision_extractor"; state: "completed"; payload: VisionResult }
@@ -767,6 +796,8 @@ export type SessionEvent =
 | `ILMU_API_KEY`, `ILMU_BASE_URL`, `ILMU_MODEL` | api | optional (provider disabled if key missing) | – |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | api | optional (provider disabled if key missing) | model `claude-sonnet-4-5` |
 | `OCR_ENGINE` | api | optional | `paddleocr` \| `tesseract`, default `paddleocr` |
+| `EMBEDDING_PROVIDER` | api | optional | `hash` \| `api`, default `hash` |
+| `EMBEDDING_API_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` | api | required only when `EMBEDDING_PROVIDER=api` (provider disabled, `hash` used, if missing) | 384-dim output required |
 | `CACHE_TTL_SECONDS` | api | optional | int 60–604800, default 86400 |
 | `SANITIZER_MAX_CHARS` | api | optional | int 1–100000, default 10000 |
 | `MAX_CONCURRENT_SESSIONS` | api | optional | int 1–8, default 2 |
@@ -798,7 +829,11 @@ Each property is implemented as a property-based test (Hypothesis for Python, fa
 
 7. **Severity classification.** For all anomalies of type `orphan_foreign_key`, `byte_offset_overflow`, `negative_stock` and `negative_ledger_balance`, severity is `critical`, regardless of any stubbed LLM output (including an LLM asking for `low`). For `statistical_outlier`, severity is `low` when the lowest score ≥ −0.30 and `medium` otherwise, never `critical`, and confidence equals `round(min(1, −min_score/0.5), 2)`. Every anomaly has exactly one severity from {low, medium, critical}. *Validates: 7.5, 7.7, 7.8.*
 
-8. **ML scoring determinism and geometry.** For all feature matrices with ≥ 20 rows and a non-constant numeric column, two runs give equal Outlier_Scores and Spatial_Coordinates at 6 dp; each coordinate is finite and in [−1, 1]; a row is flagged iff `score < −0.15` (the boundary value −0.15 is not flagged); every row has exactly one coordinate triple; an all-zero axis yields 0.0; when fewer than 3 dimensions are non-constant the remaining coordinates are 0.0; entities violating the skip rules are skipped with the specified reason and no score. *Validates: 6.2–6.7, 6.13–6.16.*
+8. **ML scoring determinism and geometry.** For all datasets with ≥ 20 rows and a non-constant numeric column, two runs (including one in a fresh process) give equal Outlier_Scores and embedding-based Spatial_Coordinates at 6 dp; each coordinate is finite and in [−1, 1] on every axis, for both the embedding and the numeric source; a row is flagged iff `score < −0.15` (the boundary value −0.15 is not flagged); every row has exactly one coordinate triple; an all-zero axis yields 0.0; when fewer than 3 dimensions are non-constant the remaining coordinates are 0.0; entities violating the skip rules are skipped with the specified reason and no score. *Validates: 6.2–6.7, 6.13–6.16.*
+
+19. **Embedding fallback equivalence.** For all datasets accepted by the skip rules and all embedding failures (provider error, timeout, wrong dimension, NaN/inf components, all-constant embeddings), the node does not skip, reports `coordinate_source = "numeric"` with the matching `embedding_fallback_reason`, and its Spatial_Coordinates equal, at 6 dp, those of the numeric-only PCA computed directly (the pre-change behaviour); Outlier_Scores and flags are identical to a run with a working provider. *Validates: 6.13, 6.16, 6.24, 6.26.*
+
+20. **Embedding provider contract and reuse.** For all record texts, `HashEmbeddingProvider` returns the same 384 finite float32 components in two processes, with L2 norm 1 (or the zero vector for empty text) and no use of Python's salted `hash()`; the `api` provider output is accepted only with 384 finite components per input. For all sessions, the vectors passed to `vector_store.index_session` are the exact arrays produced by `ml_rot_scorer` (an embedding-call counter shows one call per record), and the Spatial_Coordinates are identical whether the vector store is reachable or not. *Validates: 6.20–6.23, 6.25, 14.1, 14.13.*
 
 9. **Deterministic rot rules.** For all datasets with injected defects, the matching anomaly is produced for each injected orphan FK, negative stock, negative balance, byte-length mismatch and duplicate, and none for clean datasets; zero rows yields an empty list without error. *Validates: 3.5, 7.2, 7.11.*
 
@@ -844,6 +879,7 @@ All API errors use `ErrorResponse`. A FastAPI `RequestValidationError` handler c
 | Copybook | Unsupported syntax / no layout | fatal | `failed (copybook_error)` with line and construct text; session data unchanged | `info` |
 | `schema_archaeologist` | Output fails Pydantic | fatal | `failed (schema_validation_failed)` listing each invalid field; output discarded | `error` |
 | `ml_rot_scorer` | Entity too small / constant | yes | entity `skipped` with reason | `info` |
+| `ml_rot_scorer` | Embedding provider error / > 20 s / invalid vector / degenerate embeddings | yes | PCA over numeric columns; `coordinate_source = "numeric"` and `embedding_fallback_reason` in the `completed` payload | `warning` |
 | `ml_rot_scorer` | sklearn exception / > 30 s | yes | node `skipped (scoring_error \| timeout)`; partial results discarded | `warning` |
 | `rot_detector` | No provider | yes | `semantic_checks = skipped` | `info` |
 | `rot_detector` | Router failure / > 60 s | yes | deterministic and ML anomalies kept; `semantic_skip_reason`, `error` | `warning` |
@@ -889,7 +925,7 @@ Failed or cancelled sessions are never cached, and session records of failed run
 | Score ∈ [0, 1], severity in the enum, box ≥ 1 px | Pydantic models | The wire boundary; every producer and the cache reader pass through it |
 | Box inside the original image | `vision_extractor` post-step | Needs the image dimensions, which a standalone model lacks |
 | Anomaly rows ⊆ input rows | `rot_detector` final check and `ml_rot_scorer` construction | Only these see the dataset |
-| ML values never touched by an LLM | Import rule: `ml_rot_scorer` and `services/ml.py` cannot import `core.llm`; `rot_detector` copies ML anomalies without mutating them (frozen models) | Structural, so it cannot be broken by a later edit |
+| ML values never touched by an LLM | Import rule: `ml_rot_scorer`, `services/ml.py` and `services/embeddings.py` cannot import `core.llm`; `rot_detector` copies ML anomalies without mutating them (frozen models) | Structural, so it cannot be broken by a later edit |
 | Size, extension and signature limits | API `file_checks.py` (authoritative); web and MCP duplicate for UX only | Clients cannot be trusted |
 | Session isolation of search | `vector_store.search` takes `index_key` from the session store, never from the request | Prevents a caller from choosing another session's key |
 | Every cache entry has a TTL | `cache.set` (only call site of `SET`) | Single code path |
@@ -959,7 +995,7 @@ Jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `ap
 
 ### Risks to watch during implementation
 
-- **Image size.** PaddlePaddle CPU plus OpenCV, scikit-learn, onnxruntime and the embedding model may approach 1.2 GB. The image gate runs from the first API commit. If it fails, the fallback is to move PaddleOCR into an optional extra and default `OCR_ENGINE` to `tesseract` in the Docker image (the requirements allow both values).
-- **Indexing time.** 50,000 records in 120 s needs roughly 420 embeddings/s on a small CPU. If the benchmark misses, the mitigation is a smaller `max_length` for record text, not a larger timeout.
+- **Image size.** PaddlePaddle CPU plus OpenCV and scikit-learn may approach 1.2 GB (the default hash embedding adds no model weights). The image gate runs from the first API commit. If it fails, the fallback is to move PaddleOCR into an optional extra and default `OCR_ENGINE` to `tesseract` in the Docker image (the requirements allow both values).
+- **Indexing time.** The default hash provider embeds 50,000 records in well under the 10 s of 6.9 and indexing then only upserts vectors. For the optional `api` provider, 50,000 records in 120 s needs roughly 420 embeddings/s; if it misses, the mitigation is a smaller `max_length` for record text, not a larger timeout. The embedding matrix (about 77 MB at 50,000 rows) stays in memory until `api_resurrector` ends.
 - **OCR speed.** Per-cell OCR on large grids may exceed 45 s; this is by design routed to the vision-LLM fallback, and the benchmark records how often.
 - **ILMU contract** (assumption 1) must be confirmed before Phase 2 starts.

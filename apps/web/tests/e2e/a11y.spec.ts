@@ -33,8 +33,7 @@ test.describe("keyboard and preset flow", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: /Upload files/ })).toBeFocused();
+    await expect(page.getByRole("button", { name: /Drop files here/ })).toBeFocused();
     await page.keyboard.press("Tab");
     const first = page.getByRole("radio", { name: LEDGER });
     await expect(first).toBeFocused();
@@ -145,6 +144,7 @@ test.describe("zoom 100/150/200%", () => {
 test.describe("axe-core", () => {
   test("empty state (dialog dismissed)", async ({ page }) => {
     await page.goto("/");
+    await expect(page.getByRole("dialog")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
     await expectNoViolations(page);
