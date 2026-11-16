@@ -235,15 +235,15 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Over all ILMU/Claude outcome combinations (ok, HTTP error, timeout, invalid structure) with `respx`: ILMU first, Claude at most once and only after an ILMU failure with the fallback event emitted before the Claude request, double failure names both providers, no credential string appears in messages, events or logs
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.6, 8.7**
 
-- [ ] 16. Vision services
-  - [ ] 16.1 Implement `services/vision.py` (process-pool safe, pure)
+- [x] 16. Vision services
+  - [x] 16.1 Implement `services/vision.py` (process-pool safe, pure)
     - Header-based size checks (width/height at least 200, at most 40,000,000 pixels), deskew with angle clamped to ±45 and rounded to 0.1, CLAHE (clip 2.0, 8x8), Gaussian adaptive threshold, morphological table-grid detection with open-side detection, row/column clustering, 10,000-cell cap checked before OCR, per-cell OCR with engine selection and failover (PaddleOCR recognition-only, Tesseract `--psm 7`), inverse-deskew box mapping clamped into the original image with width and height at least 1, confidence rounded to two decimals, `smudged = confidence < 0.6`, and `smudged_digit`, `torn_total`, `misaligned_column` defect rules
     - _Requirements: 4.3, 4.4, 4.5, 4.6, 4.7, 4.11, 4.12, 4.13, 4.15, 4.19, 4.20_
-  - [ ] 16.2 Write property test for vision geometry
+  - [x] 16.2 Write property test for vision geometry
     - **Property 16: Vision geometry**
     - Synthetic skewed table images (angles -45..45): every box inside the original image with width and height at least 1, rows ordered top to bottom from 1, cells left to right, `smudged` equals `confidence < 0.6`
     - **Validates: Requirements 4.4, 4.5, 4.11, 4.12**
-  - [ ] 16.3 Implement the vision-LLM fallback helper
+  - [x] 16.3 Implement the vision-LLM fallback helper
     - Re-encode the decoded array with `cv2.imencode` (drops EXIF), downscale to at most 1568 px on the long edge, call the router once with the `VisionTable` response model, scale boxes back, reject boxes outside the image as validation failures, sanitize returned text with `sanitize_cell`
     - _Requirements: 4.8, 4.9, 4.10, 8.8_
 
