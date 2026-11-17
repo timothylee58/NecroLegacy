@@ -347,19 +347,19 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - _Requirements: 4.2, 5.1, 6.8, 9.2, 10.5, 10.11, 14.2, 17.11_
 
 - [x] 22. Sessions, routes, presets and app wiring
-  - [ ] 22.1 Implement sessions routes
+  - [x] 22.1 Implement sessions routes
     - `app/routes/sessions.py`: `POST /api/sessions` (multipart `file` and optional `.cpy` `copybook`, upload processing order from the design, hash, cache lookup, session creation within 2 s, background task guarded by `asyncio.Semaphore(MAX_CONCURRENT_SESSIONS)` with a queue cap of 10 giving `503 busy`), `POST /api/sessions/preset`, `GET /api/sessions/{id}/events` (SSE frames, `Last-Event-ID` header or `last_event_id` query validated as an integer in `[0, last_id]`, `X-Necro-Cache`, 15 s keepalive, terminal flush and close, replay), `GET /api/sessions/{id}`, `GET /api/sessions/{id}/anomalies` with severity and entity filters; cached sessions preload the event log and set `served_from_cache`; success caches only completed sessions
     - _Requirements: 1.7, 1.8, 1.11, 1.12, 10.1, 10.6, 10.8, 15.1, 15.2, 15.3, 15.5, 15.9, 16.2, 17.5, 17.6_
-  - [ ] 22.2 Implement search, presets and health routes
+  - [x] 22.2 Implement search, presets and health routes
     - `app/routes/search.py` (`POST /api/sessions/{id}/search`: 422 `invalid_query` for empty, whitespace-only or over 500 characters, 409 `not_indexed`, 503 `search_unavailable` within 5 s, session-restricted via `index_key`), `app/services/presets.py` and `app/routes/presets.py` (`GET /api/presets`, `GET /api/presets/{id}/image`), `app/routes/health.py`
     - _Requirements: 14.3, 14.7, 14.8, 14.9, 14.11, 14.12, 1.3, 4.2_
-  - [ ] 22.3 Implement `main.py` wiring
+  - [x] 22.3 Implement `main.py` wiring
     - FastAPI lifespan (settings, `ensure_schema`, Redis, router, process pool, purge task), `CORSMiddleware` with exactly `WEB_ORIGIN`, methods GET/POST, headers `Content-Type`, `Last-Event-ID`, `Authorization`, exposed `X-Necro-Cache`, no wildcard, optional constant-time bearer check when `API_TOKEN` is set and `Authorization` is present, error handlers from task 11.2
     - _Requirements: 17.5, 17.9, 17.12, 8.5_
-  - [ ] 22.4 Write API integration tests
+  - [x] 22.4 Write API integration tests
     - `TestClient` with `fakeredis` and fake store: cache hit replays identical events with the cached indicator, SSE reconnect with `Last-Event-ID`, invalid `Last-Event-ID` gives 400, search before indexing gives 409, "Show all warehouse transfers with missing branch codes" on the F&B preset returns only empty-branch records, Redis down still completes a session, validation errors list fields without side effects, CORS rejects other origins, cached first byte under 300 ms for a 10 MB payload
     - _Requirements: 14.6, 14.12, 15.2, 15.3, 15.5, 15.6, 10.8, 17.6, 17.12_
-  - [ ] 22.5 Write the OpenAPI and TypeScript contract test
+  - [x] 22.5 Write the OpenAPI and TypeScript contract test
     - Dump `app.openapi()`, convert with `json-schema-to-typescript`, and add a `tsc` file asserting mutual assignability with `apps/web/src/types/autopsy.ts`; validate the mock event stream against the Pydantic `SessionEvent` models
     - _Requirements: 19.9_
 
