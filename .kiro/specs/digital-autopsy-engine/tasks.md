@@ -384,7 +384,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Upload, preset, keyboard-only flow, X-Ray toggle with a real image preset, SSE reconnect by killing the stream
     - _Requirements: 10.7, 10.9, 12.3, 1.10_
 
-- [ ] 25. Checkpoint - Phase 2 complete
+- [x] 25. Checkpoint - Phase 2 complete
   - Ensure all tests pass (`pytest apps/api`, `ruff`, `mypy`, import-linter, web `tsc --noEmit` and `vitest run`), ask the user if questions arise.
 
 ### Phase 3: MCP server, CI and repository checks
