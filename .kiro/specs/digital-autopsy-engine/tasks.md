@@ -407,22 +407,22 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - fast-check over invalid inputs naming every invalid parameter with no `fetch` call; size, signature and missing-env rejections with no `fetch`; 404 mapping; 30 s timeout with fake timers; filter semantics
     - _Requirements: 16.2, 16.4, 16.5, 16.6, 16.7, 16.8, 16.10, 16.11_
 
-- [ ] 27. Repository checks, CI and documentation
-  - [ ] 27.1 Implement repository check scripts
+- [x] 27. Repository checks, CI and documentation
+  - [x] 27.1 Implement repository check scripts
     - `scripts/check_manifests.py` (fails and reports manifest and package for `opencv-python`, `torch`, `nvidia-*`, `cuda*`; requires `opencv-python-headless`), `scripts/check_presets.py` (Luhn-valid card numbers, email, phone and SSN patterns reported by file name; PNG EXIF and `tEXt/iTXt/zTXt` chunks; runs the vision extractor on the PNG and scans its text; checks the PNG is valid, at most 10 MB and at least 1,000 px wide), and a `.kiro` check that no `.gitignore` pattern ignores any file under `.kiro`
     - _Requirements: 19.5, 19.10, 19.11, 19.13, 19.3_
-  - [ ] 27.2 Write unit tests for the repository checks
+  - [x] 27.2 Write unit tests for the repository checks
     - Positive and negative fixtures for each check (a Luhn-valid number, a forbidden package, an ignored `.kiro` path)
     - _Requirements: 19.5, 19.11, 19.13_
-  - [ ] 27.3 Write the CI workflow
+  - [x] 27.3 Write the CI workflow
     - `.github/workflows/ci.yml` jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `api` (ruff, mypy, pytest with Postgres and Redis services, import-linter), `mcp` (tsc, Vitest), `contract` (OpenAPI vs types), `repo-checks` (manifests, presets, `.kiro` ignore, gitleaks, README variable check), `image` (build, size gate, smoke test)
     - _Requirements: 19.12, 19.13, 17.7, 4.21_
-  - [ ] 27.4 Write the README and verify LICENSE
+  - [x] 27.4 Write the README and verify LICENSE
     - `README.md` with project overview, monorepo layout, local run steps, the environment variable table (name, purpose, required or optional for Vercel and Railway, no secret values, including `OCR_ENGINE` and the `EMBEDDING_*` settings, with a note that `EMBEDDING_PROVIDER=api` sends record text to a third party), and a Kiro `mcp.json` example for the MCP server
     - Confirm `LICENSE` is the MIT text naming a copyright holder and year and fix it if not
     - Add a script run in CI that fails when a `Settings` field is not documented in the README table
     - _Requirements: 19.6, 19.7, 17.10_
-  - [ ] 27.5 Write a test for the README variable check
+  - [x] 27.5 Write a test for the README variable check
     - Fails when a `Settings` field is missing from the table and passes when all are present
     - _Requirements: 19.7_
 
