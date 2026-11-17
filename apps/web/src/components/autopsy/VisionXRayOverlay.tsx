@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import { ScanLine } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { flaggedRegions, LOW_CONFIDENCE_THRESHOLD } from "@/lib/session-reducer";
 import type { VisionCell, VisionDefect, VisionResult } from "@/types/autopsy";
@@ -154,7 +155,7 @@ export function VisionXRayOverlay({
       };
 
   return (
-    <section className="flex flex-col gap-3" aria-label="Vision X-Ray">
+    <section className="flex flex-col gap-4" aria-label="Vision X-Ray">
       <div className="flex flex-wrap items-center gap-3">
         <Toggle
           pressed={visible}
@@ -162,16 +163,17 @@ export function VisionXRayOverlay({
           aria-disabled={disabled ? "true" : undefined}
           aria-describedby={reason ? reasonId : undefined}
         >
+          <ScanLine aria-hidden="true" className="h-4 w-4" />
           Vision X-Ray
         </Toggle>
         {reason && (
-          <p id={reasonId} className="text-sm">
+          <p id={reasonId} className="text-sm text-muted-foreground">
             {reason}
           </p>
         )}
       </div>
 
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative" }} className="border border-border bg-slab">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
@@ -206,7 +208,7 @@ export function VisionXRayOverlay({
               <span
                 key={keyOf(r.row, r.col)}
                 aria-hidden="true"
-                className="absolute bg-black/80 px-1 text-[10px] leading-tight text-white"
+                className="absolute bg-[hsl(36_14%_5%/0.88)] px-1 font-mono text-[10px] leading-tight text-foreground"
                 style={{ left: pct(r.bbox.x, imageWidth), top: pct(r.bbox.y, imageHeight) }}
               >
                 {`R${r.row}C${r.col} ${r.defectType ?? "low confidence"}`}
@@ -215,7 +217,7 @@ export function VisionXRayOverlay({
             {active && (
               <div
                 role="tooltip"
-                className="absolute z-10 rounded border border-border bg-background px-2 py-1 text-xs shadow"
+                className="absolute z-10 rounded border border-border bg-popover px-2 py-1.5 font-mono text-xs shadow-[0_8px_24px_-6px_rgb(0_0_0/0.7)]"
                 style={{
                   left: pct(active.bbox.x, imageWidth),
                   top: pct(active.bbox.y + active.bbox.height, imageHeight),
@@ -230,23 +232,23 @@ export function VisionXRayOverlay({
         )}
       </div>
 
-      <div className="flex items-center gap-2 text-xs" aria-label="Opacity legend">
+      <div role="group" className="flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground" aria-label="Opacity legend">
         <span>Confidence 1.0 (opacity 0.1)</span>
         <span
           aria-hidden="true"
-          className="h-3 w-32 rounded border border-border"
+          className="h-2.5 w-32 border border-border"
           style={{ background: `linear-gradient(to right, ${GREEN}1A, ${GREEN}99)` }}
         />
         <span>0.0 (opacity 0.6)</span>
       </div>
 
-      <h2 id={headingId} className="text-sm font-semibold">
+      <h2 id={headingId} className="font-display text-2xl uppercase leading-none tracking-notice">
         Flagged regions ({regions.length})
       </h2>
       {regions.length === 0 ? (
-        <p className="text-sm">No defects were detected.</p>
+        <p className="text-sm text-verdigris">No defects were detected.</p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex max-h-72 flex-col overflow-y-auto border-t border-border">
           {regions.map((r) => {
             const k = keyOf(r.row, r.col);
             const pinned = pinnedKey === k;
@@ -261,7 +263,7 @@ export function VisionXRayOverlay({
                 key={k}
                 tabIndex={0}
                 aria-current={pinned ? "true" : undefined}
-                className="cursor-pointer rounded border border-border px-2 py-1 text-sm"
+                className="cursor-pointer border-b border-border px-1 py-2 font-mono text-xs hover:bg-accent aria-[current=true]:bg-crimson/15 aria-[current=true]:text-foreground"
                 onMouseEnter={() => setHoverKey(k)}
                 onMouseLeave={() => setHoverKey(null)}
                 onFocus={() => setHoverKey(k)}

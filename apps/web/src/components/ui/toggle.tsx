@@ -10,7 +10,7 @@ const Toggle = React.forwardRef<
   <TogglePrimitive.Root
     ref={ref}
     className={cn(
-      "inline-flex h-10 items-center justify-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent data-[state=on]:bg-accent data-[state=on]:underline disabled:opacity-50",
+      "inline-flex h-10 items-center justify-center gap-2 rounded border border-border px-3 text-sm font-semibold transition-colors hover:border-foreground/40 data-[state=on]:border-tallow data-[state=on]:bg-tallow/10 data-[state=on]:text-tallow aria-disabled:cursor-not-allowed aria-disabled:opacity-60 disabled:opacity-50",
       className,
     )}
     {...props}

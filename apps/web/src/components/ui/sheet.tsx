@@ -43,7 +43,7 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
           {open && (
             <SheetPrimitive.Overlay key="overlay" forceMount asChild>
               <motion.div
-                className="fixed inset-0 z-50 bg-black/70"
+                className="fixed inset-0 z-50 bg-[hsl(36_14%_4%/0.72)]"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -55,7 +55,7 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
             <SheetPrimitive.Content key="content" ref={ref} forceMount asChild {...props}>
               <motion.div
                 className={cn(
-                  "fixed inset-y-0 z-50 w-3/4 max-w-sm overflow-y-auto border-border bg-popover p-6 text-popover-foreground",
+                  "fixed inset-y-0 z-50 w-3/4 max-w-sm overflow-y-auto border-border bg-popover p-6 text-popover-foreground shadow-[-24px_0_60px_-20px_rgb(0_0_0/0.7)] sm:p-8",
                   side === "right" ? "right-0 border-l" : "left-0 border-r",
                   className,
                 )}
@@ -65,7 +65,11 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
                 transition={transition}
               >
                 {children}
-                <SheetPrimitive.Close ref={closeRef} className="absolute right-4 top-4 rounded-md p-1" aria-label="Close">
+                <SheetPrimitive.Close
+                  ref={closeRef}
+                  className="absolute right-3 top-3 rounded p-2 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Close"
+                >
                   <X className="h-4 w-4" aria-hidden="true" />
                 </SheetPrimitive.Close>
               </motion.div>
@@ -82,7 +86,7 @@ const SheetTitle = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <SheetPrimitive.Title ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+  <SheetPrimitive.Title ref={ref} className={cn("notice pr-10 text-4xl", className)} {...props} />
 ));
 SheetTitle.displayName = "SheetTitle";
 const SheetDescription = React.forwardRef<

@@ -2,7 +2,9 @@
 import { useCallback, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, KeyboardEvent } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ArrowRight, CircleAlert, LoaderCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ApiRequestError, type AutopsyClient, type SessionInput } from "@/lib/api-client";
 import { getExtension, validateFile } from "@/lib/file-validation";
 import type { CreateSessionResponse, PresetId } from "@/types/autopsy";
@@ -14,10 +16,10 @@ export interface DropzoneModalProps {
   onOpenChange(open: boolean): void;
 }
 
-export const PRESETS: ReadonlyArray<{ id: PresetId; label: string }> = [
-  { id: "ledger_1994", label: "1994 Mainframe Ledger Dump" },
-  { id: "fnb_pos_corrupted", label: "Corrupted F&B Warehouse POS Batch" },
-  { id: "dotmatrix_manifest", label: "Faded Dot-Matrix Manifest" },
+export const PRESETS: ReadonlyArray<{ id: PresetId; label: string; meta: string }> = [
+  { id: "ledger_1994", label: "1994 Mainframe Ledger Dump", meta: "mainframe_ledger_1994.dat · fixed-width ledger" },
+  { id: "fnb_pos_corrupted", label: "Corrupted F&B Warehouse POS Batch", meta: "fnb_pos_corrupted_batch.txt · POS batch" },
+  { id: "dotmatrix_manifest", label: "Faded Dot-Matrix Manifest", meta: "faded_dotmatrix_manifest.png · scanned manifest" },
 ];
 
 const UPLOAD_TIMEOUT_MS = 10_000;
@@ -33,6 +35,7 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
   const [busy, setBusy] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
   const [selected, setSelected] = useState<PresetId | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const upload = useCallback(
     async (input: SessionInput) => {
@@ -125,67 +128,108 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Begin an autopsy</DialogTitle>
-        <DialogDescription>
-          Drop a legacy dump, copybook or scan, or choose a built-in synthetic preset.
-        </DialogDescription>
+        <div className="grid gap-2 pr-8">
+          <DialogTitle>Begin an autopsy</DialogTitle>
+          <DialogDescription className="max-w-[52ch] text-sm leading-relaxed">
+            Drop a legacy dump, copybook or scan, or choose a built-in synthetic preset.
+          </DialogDescription>
+        </div>
 
         <div
           role="button"
           tabIndex={0}
-          aria-label="Drop files here or press Enter to browse. Accepted extensions: .dat, .txt, .csv, .cpy, .png, .jpg, .jpeg."
           onClick={openPicker}
           onKeyDown={onZoneKey}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          className="rounded-md border-2 border-dashed border-border p-8 text-center"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            setDragging(false);
+            onDrop(e);
+          }}
+          className={cn(
+            "grid cursor-pointer place-items-center gap-2 rounded border border-dashed px-6 py-8 text-center transition-colors",
+            dragging ? "border-tallow bg-tallow/10" : "border-foreground/30 hover:border-tallow hover:bg-accent",
+          )}
         >
-          Drop files here or press Enter to browse
+          <Upload aria-hidden="true" className="h-5 w-5 text-tallow" />
+          <span className="font-semibold">Drop files here or press Enter to browse</span>
+          <span className="font-mono text-xs text-muted-foreground">
+            Accepted: .dat .txt .csv .cpy up to 5 MB, .png .jpg .jpeg up to 10 MB
+          </span>
         </div>
         <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept=".dat,.txt,.csv,.cpy,.png,.jpg,.jpeg"
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden="true"
-            onClick={(e) => e.stopPropagation()}
-            onChange={onInputChange}
-          />
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".dat,.txt,.csv,.cpy,.png,.jpg,.jpeg"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={(e) => e.stopPropagation()}
+          onChange={onInputChange}
+        />
 
-        <div role="radiogroup" aria-label="Sample presets" className="grid gap-2">
-          {PRESETS.map((p, i) => (
-            <button
-              key={p.id}
-              ref={(el) => {
-                presetRefs.current[i] = el;
-              }}
-              type="button"
-              role="radio"
-              aria-checked={selected === p.id}
-              tabIndex={i === focusIndex ? 0 : -1}
-              onFocus={() => setFocusIndex(i)}
-              onClick={() => selectPreset(p.id)}
-              onKeyDown={(e) => onPresetKey(e, i, p.id)}
-              className="rounded-md border border-border px-3 py-2 text-left aria-checked:border-primary"
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="grid gap-2">
+          <p id="preset-heading" className="label">
+            Or open a synthetic case
+          </p>
+          <div role="radiogroup" aria-labelledby="preset-heading" className="grid border-y border-border">
+            {PRESETS.map((p, i) => (
+              <button
+                key={p.id}
+                ref={(el) => {
+                  presetRefs.current[i] = el;
+                }}
+                type="button"
+                role="radio"
+                aria-label={p.label}
+                aria-describedby={`preset-${p.id}-meta`}
+                aria-checked={selected === p.id}
+                tabIndex={i === focusIndex ? 0 : -1}
+                onFocus={() => setFocusIndex(i)}
+                onClick={() => selectPreset(p.id)}
+                onKeyDown={(e) => onPresetKey(e, i, p.id)}
+                disabled={busy && selected !== p.id}
+                className="group grid grid-cols-[1fr_auto] items-center gap-x-4 border-t border-border px-1 py-3 text-left transition-colors first:border-t-0 hover:bg-accent aria-checked:bg-tallow/10"
+              >
+                <span className="min-w-0">
+                  <span className="block font-semibold">{p.label}</span>
+                  <span id={`preset-${p.id}-meta`} className="block font-mono text-xs text-muted-foreground">
+                    {p.meta}
+                  </span>
+                </span>
+                {busy && selected === p.id ? (
+                  <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin text-tallow motion-reduce:animate-none" />
+                ) : (
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-tallow"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         {busy && (
-          <p role="status" className="text-sm">
+          <p role="status" className="text-sm text-tallow">
             Uploading…
           </p>
         )}
         {failure && (
-          <div role="alert" className="grid gap-2 text-sm">
-            <p>{failure.message}</p>
+          <div role="alert" className="grid gap-3 rounded border border-crimson/60 bg-crimson/10 p-3 text-sm">
+            <p className="flex gap-2">
+              <CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-crimson-ink" />
+              <span>{failure.message}</span>
+            </p>
             {failure.kind === "upload" && (
               <Button
                 type="button"
+                size="sm"
+                className="justify-self-start"
                 onClick={() => lastInput.current && void upload(lastInput.current)}
                 disabled={busy}
               >

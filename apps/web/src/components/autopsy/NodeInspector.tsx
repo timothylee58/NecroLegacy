@@ -58,20 +58,24 @@ export function NodeInspector({ entity, anomalies, open, onOpenChange, opener, r
         className="w-full max-w-xl"
       >
         <SheetTitle>Entity: {entity.name}</SheetTitle>
-        <SheetDescription>{description}</SheetDescription>
+        <SheetDescription className="mt-2 tabular">{description}</SheetDescription>
 
-        <section aria-labelledby="ni-fields" className="mt-4">
-          <h3 id="ni-fields" className="font-medium">Fields</h3>
-          <table className="mt-1 w-full text-left text-sm">
-            <thead>
-              <tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Range</th></tr>
+        <section aria-labelledby="ni-fields" className="mt-8">
+          <h3 id="ni-fields" className="label">Fields</h3>
+          <table className="mt-2 w-full text-left text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-b border-border">
+                <th scope="col" className="py-1.5 pr-3 font-medium">Name</th>
+                <th scope="col" className="py-1.5 pr-3 font-medium">Type</th>
+                <th scope="col" className="py-1.5 font-medium">Range</th>
+              </tr>
             </thead>
             <tbody>
               {entity.fields.map((f) => (
-                <tr key={f.name}>
-                  <th scope="row" className="font-normal">{f.name}</th>
-                  <td>{f.type}</td>
-                  <td>{f.start}–{f.end} ({entity.position_unit})</td>
+                <tr key={f.name} className="border-b border-border/60">
+                  <th scope="row" className="py-1.5 pr-3 font-mono font-normal">{f.name}</th>
+                  <td className="py-1.5 pr-3 font-mono text-muted-foreground">{f.type}</td>
+                  <td className="py-1.5 font-mono text-muted-foreground">{f.start}–{f.end} ({entity.position_unit})</td>
                 </tr>
               ))}
             </tbody>
@@ -79,46 +83,46 @@ export function NodeInspector({ entity, anomalies, open, onOpenChange, opener, r
         </section>
 
         {mine.length === 0 ? (
-          <p className="mt-4">No anomalies were detected for this entity.</p>
+          <p className="mt-8 border-y border-border py-4 text-sm text-verdigris">No anomalies were detected for this entity.</p>
         ) : (
           <>
-            <section aria-labelledby="ni-samples" className="mt-4">
-              <h3 id="ni-samples" className="font-medium">Sample corrupted rows</h3>
-              <div className="overflow-x-auto">
-                <table className="mt-1 w-full text-left text-sm">
-                  <thead>
+            <section aria-labelledby="ni-anomalies" className="mt-8">
+              <h3 id="ni-anomalies" className="label">Anomalies</h3>
+              <ul className="mt-2 flex flex-col border-t border-border">
+                {mine.map((a) => (
+                  <li key={a.id} className="border-b border-border py-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-display text-xl uppercase leading-tight tracking-notice">{a.name.replace(/_/g, " ")}</span>
+                      <SeverityBadge severity={a.severity} />
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed">{a.root_cause}</p>
+                    <p className="mt-1 font-mono text-xs text-muted-foreground">Confidence: {a.confidence.toFixed(2)}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section aria-labelledby="ni-samples" className="mt-8">
+              <h3 id="ni-samples" className="label">Sample corrupted rows</h3>
+              <div role="group" tabIndex={0} aria-label="Sample rows, scrollable" className="mt-2 overflow-x-auto border border-border">
+                <table className="w-full whitespace-nowrap text-left font-mono text-xs">
+                  <thead className="bg-muted text-muted-foreground">
                     <tr>
-                      <th scope="col">Row</th>
-                      {columns.map((c) => <th key={c} scope="col">{c}</th>)}
+                      <th scope="col" className="px-2 py-1.5 font-medium">Row</th>
+                      {columns.map((c) => <th key={c} scope="col" className="px-2 py-1.5 font-medium">{c}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {samples.map((s) => (
-                      <tr key={s.row_number}>
-                        <th scope="row" className="font-normal">{s.row_number}</th>
-                        {columns.map((c) => <td key={c}>{s.values[c] ?? ""}</td>)}
+                      <tr key={s.row_number} className="border-t border-border">
+                        <th scope="row" className="px-2 py-1.5 font-normal text-crimson-ink">{s.row_number}</th>
+                        {columns.map((c) => <td key={c} className="px-2 py-1.5">{s.values[c] ?? ""}</td>)}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {total > MAX_SAMPLES && <p className="mt-1 text-sm">{total} corrupted rows in total</p>}
-            </section>
-
-            <section aria-labelledby="ni-anomalies" className="mt-4">
-              <h3 id="ni-anomalies" className="font-medium">Anomalies</h3>
-              <ul className="mt-1 flex flex-col gap-2">
-                {mine.map((a) => (
-                  <li key={a.id} className="rounded-md border p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{a.name.replace(/_/g, " ")}</span>
-                      <SeverityBadge severity={a.severity} />
-                    </div>
-                    <p className="text-sm">Confidence: {a.confidence.toFixed(2)}</p>
-                    <p className="text-sm">{a.root_cause}</p>
-                  </li>
-                ))}
-              </ul>
+              {total > MAX_SAMPLES && <p className="mt-2 text-xs text-muted-foreground tabular">{total} corrupted rows in total</p>}
             </section>
           </>
         )}

@@ -59,11 +59,12 @@ export function SearchPanel({ client, sessionId, onHits }: SearchPanelProps) {
   }
 
   return (
-    <section aria-label="Search records" className="flex flex-col gap-3">
+    <section aria-label="Search records" className="flex flex-col gap-4">
       <form onSubmit={submit} noValidate className="flex flex-col gap-2">
-        <label htmlFor={inputId} className="text-sm font-medium">
+        <label htmlFor={inputId} className="font-display text-3xl uppercase leading-none tracking-notice">
           Search records
         </label>
+        <p className="text-sm text-muted-foreground">Ask in plain words, for example: transfers with missing branch codes.</p>
         <div className="flex gap-2">
           <input
             id={inputId}
@@ -75,38 +76,38 @@ export function SearchPanel({ client, sessionId, onHits }: SearchPanelProps) {
             }}
             aria-invalid={validation ? true : undefined}
             aria-describedby={validation ? errorId : undefined}
-            className="flex-1 rounded-md border px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="h-10 min-w-0 flex-1 rounded border border-border bg-slab px-3 text-sm text-foreground placeholder:text-muted-foreground hover:border-foreground/40 aria-[invalid=true]:border-crimson"
           />
           <button
             type="submit"
             disabled={status === "loading"}
-            className="rounded-md border px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="h-10 shrink-0 rounded bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-tallow disabled:opacity-60"
           >
             {status === "loading" ? "Searching…" : "Search"}
           </button>
         </div>
         {validation && (
-          <p id={errorId} role="alert" className="text-sm">
+          <p id={errorId} role="alert" className="text-sm text-crimson-ink">
             {validation}
           </p>
         )}
       </form>
 
-      {status === "error" && <p role="alert">Search failed. Try again.</p>}
-      {status === "done" && hits.length === 0 && <p>No records matched.</p>}
+      {status === "error" && <p role="alert" className="text-sm text-crimson-ink">Search failed. Try again.</p>}
+      {status === "done" && hits.length === 0 && <p className="text-sm text-muted-foreground">No records matched.</p>}
       {status === "done" && hits.length > 0 && (
-        <ul aria-label={`${hits.length} search results`} className="flex flex-col gap-2">
+        <ul aria-label={`${hits.length} search results`} className="flex flex-col border-t border-border">
           {hits.map((h) => (
-            <li key={`${h.entity}:${h.row_number}`} className="rounded-md border px-3 py-2">
+            <li key={`${h.entity}:${h.row_number}`} className="border-b border-border py-2.5">
               <div className="flex justify-between gap-3 text-sm">
-                <span>
+                <span className="font-mono">
                   {h.entity}, row {h.row_number}
                 </span>
-                <span>Similarity {h.similarity.toFixed(2)}</span>
+                <span className="tabular text-muted-foreground">Similarity {h.similarity.toFixed(2)}</span>
               </div>
-              <p className="truncate font-mono text-xs">{h.preview}</p>
+              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{h.preview}</p>
               {h.anomaly_flags.length > 0 && (
-                <p className="text-xs">Flags: {h.anomaly_flags.join(", ")}</p>
+                <p className="mt-1 text-xs font-semibold text-crimson-ink">Flags: {h.anomaly_flags.join(", ")}</p>
               )}
             </li>
           ))}

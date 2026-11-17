@@ -4,27 +4,98 @@
 
 @layer base {
   :root {
-    --background: 222 20% 6%;
-    --foreground: 210 20% 96%;
-    --muted: 222 14% 16%;
-    --muted-foreground: 215 16% 72%;
-    --primary: 210 20% 96%;
-    --primary-foreground: 222 20% 8%;
-    --accent: 222 14% 20%;
-    --accent-foreground: 210 20% 96%;
-    --border: 222 14% 26%;
-    --ring: 190 90% 60%;
-    --popover: 222 20% 9%;
-    --popover-foreground: 210 20% 96%;
-    --crimson: 348 83% 55%;
+    --background: 36 14% 7%;
+    --slab: 37 13% 10%;
+    --popover: 37 14% 10%;
+    --popover-foreground: 41 52% 87%;
+    --foreground: 41 52% 87%;
+    --muted: 36 12% 14%;
+    --muted-foreground: 39 18% 66%;
+    --primary: 41 52% 87%;
+    --primary-foreground: 36 14% 7%;
+    --accent: 36 12% 16%;
+    --accent-foreground: 41 52% 87%;
+    --border: 35 15% 20%;
+    --ring: 39 77% 61%;
+    --tallow: 39 77% 61%;
+    --crimson: 352 80% 62%;
+    --crimson-ink: 352 92% 72%;
+    --ochre: 31 72% 58%;
+    --formalin: 166 18% 64%;
+    --verdigris: 141 38% 58%;
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
+    caret-color: hsl(var(--tallow));
+    scrollbar-color: hsl(var(--border)) hsl(var(--background));
+  }
+
+  ::selection {
+    background: hsl(var(--tallow) / 0.35);
+    color: hsl(var(--foreground));
   }
 
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+  }
+
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 2px solid hsl(var(--background));
+  }
+
+  input[type="search"]::-webkit-search-cancel-button {
+    filter: invert(0.85) sepia(0.3);
+  }
+}
+
+@layer components {
+  .notice {
+    @apply font-display uppercase leading-[0.92] tracking-notice text-foreground;
+    text-wrap: balance;
+  }
+
+  .label {
+    @apply text-[0.72rem] font-semibold uppercase tracking-label text-muted-foreground;
+  }
+
+  /* The single overhead lamp: a pool of tallow light on the slab, the theatre's only light source. */
+  .lamp-pool {
+    background:
+      radial-gradient(ellipse 55% 60% at 50% 0%, hsl(var(--tallow) / 0.14), transparent 70%),
+      radial-gradient(ellipse 80% 70% at 50% 45%, hsl(var(--slab)), hsl(var(--background)) 85%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

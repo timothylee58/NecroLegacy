@@ -99,16 +99,20 @@ function AutopsyCanvasImpl({
 
   if (empty) {
     return (
-      <p role="status" className="rounded-md border px-3 py-6 text-center">
-        No entities to display.
-      </p>
+      <div className="grid h-full place-items-center p-6">
+        <p role="status" className="text-center text-sm text-muted-foreground">
+          No entities to display.
+        </p>
+      </div>
     );
   }
 
   if (unavailable) {
     return (
-      <div className="flex flex-col gap-3">
-        <p role="status">3D rendering is unavailable</p>
+      <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
+        <p role="status" className="text-sm text-muted-foreground">
+          3D rendering is unavailable on this device. The specimens are listed instead.
+        </p>
         <EntityList entities={entities} anomalies={anomalies} onOpen={onOpenEntity} />
       </div>
     );

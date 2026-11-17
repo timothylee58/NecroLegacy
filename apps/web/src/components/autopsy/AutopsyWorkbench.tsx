@@ -10,7 +10,10 @@ import {
   toSceneGraph,
 } from "@/lib/session-reducer";
 import type { CreateSessionResponse, SessionEvent } from "@/types/autopsy";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { AutopsyCanvasDynamic } from "./AutopsyCanvas";
+import { CoronersNotice } from "./CoronersNotice";
 import { AutopsySummary } from "./AutopsySummary";
 import { DropzoneModal, PRESETS } from "./DropzoneModal";
 import { EntityList } from "./EntityList";
@@ -124,103 +127,186 @@ function Workbench() {
 
   const showXRay = state.inputKind === "image" && state.vision !== null && imageUrl !== null;
 
+  const idle = state.phase === "idle";
+
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4 md:p-6">
-      <header className="flex flex-col justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="font-mono text-2xl font-bold tracking-tight text-emerald-400">
-            NECROLEGACY {"//"} DIGITAL AUTOPSY WORKBENCH
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            OpenCV vision extraction · scikit-learn Isolation Forest and PCA · LangGraph multi-agent forensics
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {sourceName && (
-            <span className="rounded-full border border-emerald-800 bg-emerald-950/50 px-3 py-1 font-mono text-xs text-emerald-300">
-              Active dump: {sourceName}
+    <div className="flex min-h-dvh flex-col">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 md:px-8">
+          <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
+            <span className="font-display text-[1.9rem] uppercase leading-none tracking-notice">NecroLegacy</span>
+            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground">
+              Digital autopsy workbench
             </span>
-          )}
-          <button
-          type="button"
-          onClick={() => setDropzoneOpen(true)}
-          className="rounded-md border px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
-          New autopsy
-          </button>
+          </h1>
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            {sourceName && (
+              <p className="flex min-w-0 items-center gap-2 text-sm">
+                <span className="label">Active dump</span>
+                <span className="truncate font-mono text-foreground">{sourceName}</span>
+              </p>
+            )}
+            <Button type="button" onClick={() => setDropzoneOpen(true)}>
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              New autopsy
+            </Button>
+          </div>
         </div>
       </header>
 
       <DropzoneModal client={client} onSession={onSession} open={dropzoneOpen} onOpenChange={setDropzoneOpen} />
 
-      {state.phase === "idle" ? (
-        <p className="text-muted-foreground">Upload a legacy dump or choose a preset to begin the autopsy.</p>
-      ) : (
-        <ProgressRail events={events} />
-      )}
+      <main className="mx-auto grid w-full max-w-[96rem] flex-1 gap-x-10 gap-y-8 px-4 py-8 md:px-8 lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:[grid-template-areas:'aside_notice'_'aside_table']">
+        <div className="flex flex-col gap-4 lg:[grid-area:notice]">
+          <CoronersNotice
+            phase={state.phase}
+            sourceName={sourceName}
+            currentNode={state.currentNode}
+            entities={entities}
+            anomalies={anomalies}
+            servedFromCache={state.servedFromCache}
+          />
+          {state.servedFromCache && (
+            <p role="note" className="text-sm text-muted-foreground">
+              Served from cache: this result was computed earlier.
+            </p>
+          )}
+          {state.connection.status === "reconnecting" && (
+            <p role="status" className="text-sm text-tallow">
+              Reconnecting (attempt {state.connection.attempt})…
+            </p>
+          )}
+          {state.connection.status === "lost" && (
+            <div role="alert" className="flex flex-wrap items-center gap-3 border border-crimson/60 bg-crimson/10 p-3 text-sm">
+              <span>Connection lost. Progress so far is kept.</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!sessionId) return;
+                  dispatch({ type: "connection_ok" });
+                  connect(sessionId);
+                }}
+              >
+                Retry connection
+              </Button>
+            </div>
+          )}
+          {state.phase === "failed" && (
+            <p role="alert" className="border border-crimson/60 bg-crimson/10 p-3 text-sm">
+              The autopsy failed. Partial results are shown where available.
+            </p>
+          )}
+        </div>
 
-      {state.servedFromCache && <p role="note">Served from cache: this result was computed earlier.</p>}
+        <aside aria-label="Case file" className="flex flex-col gap-8 lg:[grid-area:aside]">
+          <section aria-labelledby="procedure-heading">
+            <h2 id="procedure-heading" className="label border-b border-border pb-2">
+              Procedure
+            </h2>
+            {idle ? (
+              <p className="pt-3 text-sm text-muted-foreground">
+                Upload a legacy dump or choose a preset to begin the autopsy.
+              </p>
+            ) : (
+              <ProgressRail events={events} />
+            )}
+          </section>
+          <section aria-labelledby="specimens-heading" className="flex flex-col gap-3">
+            <h2 id="specimens-heading" className="label">
+              Specimens
+            </h2>
+            {entities.length > 0 ? (
+              <EntityList entities={entities} anomalies={anomalies} onOpen={openEntity} highlightedIds={highlighted} />
+            ) : (
+              <p className="border-y border-border py-3 text-sm text-muted-foreground">
+                {idle ? "Nothing on the table yet." : "Recovering entities…"}
+              </p>
+            )}
+            <AutopsySummary id={SUMMARY_ID} entities={entities} anomalies={anomalies} />
+          </section>
+        </aside>
 
-      {state.connection.status === "reconnecting" && (
-        <p role="status">Reconnecting (attempt {state.connection.attempt})…</p>
-      )}
-      {state.connection.status === "lost" && (
-        <div role="alert" className="flex items-center gap-3">
-          <span>Connection lost. Progress so far is kept.</span>
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            onClick={() => {
-              if (!sessionId) return;
-              dispatch({ type: "connection_ok" });
-              connect(sessionId);
-            }}
-          >
-            Retry connection
-          </button>
+        <div className={showXRay ? "grid min-w-0 gap-6 lg:[grid-area:table] xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" : "min-w-0 lg:[grid-area:table]"}>
+          {showXRay && state.vision && imageUrl && (
+            <section aria-label="Uploaded image" className="min-w-0">
+              <VisionXRayOverlay
+                imageUrl={imageUrl}
+                imageWidth={state.vision.image_width}
+                imageHeight={state.vision.image_height}
+                cells={state.vision.cells}
+                defects={state.vision.defects}
+                onAnnounce={announce}
+              />
+            </section>
+          )}
+          {state.inputKind === "image" && !showXRay && imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="Uploaded document" className="max-h-64 w-auto border border-border object-contain" />
+          )}
+
+          <div className="flex min-w-0 flex-col gap-2">
+            <div
+              ref={canvasRegionRef}
+              tabIndex={-1}
+              className="lamp-pool relative h-[clamp(22rem,56vh,38rem)] overflow-hidden border border-border"
+            >
+              {idle ? (
+                <div className="grid h-full place-items-center p-6 text-center">
+                  <div className="flex max-w-sm flex-col items-center gap-4">
+                    <p className="text-sm text-muted-foreground">
+                      The table is empty. Specimens appear here as a 3D constellation once the procedure starts.
+                    </p>
+                    {!dropzoneOpen && (
+                      <Button type="button" variant="outline" onClick={() => setDropzoneOpen(true)}>
+                        Open the intake
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <AutopsyCanvasDynamic
+                  entities={entities}
+                  anomalies={anomalies}
+                  graph={graph}
+                  highlightedIds={highlighted}
+                  summaryId={SUMMARY_ID}
+                  onSelect={(id) => openEntity(id, null)}
+                  onOpenEntity={openEntity}
+                />
+              )}
+            </div>
+            {entities.length > 0 && (
+              <ul aria-label="Table legend" className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                <li className="flex items-center gap-1.5">
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-crimson" /> Critical rot, traced along its links
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ochre" /> Low or medium findings
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-foreground" /> Healthy, steady pulse
+                </li>
+                <li>Drag to orbit · select a specimen to open its evidence</li>
+              </ul>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {sessionId && (state.schema || state.resurrection) && (
+        <div className="border-t border-border">
+          <div className="mx-auto grid w-full max-w-[96rem] gap-x-10 gap-y-12 px-4 py-10 md:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+            {state.schema ? (
+              <SearchPanel client={client} sessionId={sessionId} onHits={(hits) => dispatch({ type: "search_results", hits })} />
+            ) : (
+              <div />
+            )}
+            <GeneratedCodeView resurrection={state.resurrection} />
+          </div>
         </div>
       )}
-      {state.phase === "failed" && <p role="alert">The autopsy failed. Partial results are shown where available.</p>}
-
-      <div className={showXRay ? "grid grid-cols-1 gap-6 lg:grid-cols-12" : "flex flex-col"}>
-      {showXRay && state.vision && imageUrl && (
-        <section aria-label="Uploaded image" className="lg:col-span-5">
-          <VisionXRayOverlay
-            imageUrl={imageUrl}
-            imageWidth={state.vision.image_width}
-            imageHeight={state.vision.image_height}
-            cells={state.vision.cells}
-            defects={state.vision.defects}
-            onAnnounce={announce}
-          />
-        </section>
-      )}
-      {state.inputKind === "image" && !showXRay && imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt="Uploaded document" className="max-h-64 w-auto object-contain" />
-      )}
-
-      <div ref={canvasRegionRef} tabIndex={-1} className={showXRay ? "min-h-[24rem] lg:col-span-7" : "min-h-[24rem]"}>
-        <AutopsyCanvasDynamic
-          entities={entities}
-          anomalies={anomalies}
-          graph={graph}
-          highlightedIds={highlighted}
-          summaryId={SUMMARY_ID}
-          onSelect={(id) => openEntity(id, null)}
-          onOpenEntity={openEntity}
-        />
-      </div>
-      </div>
-
-      <AutopsySummary id={SUMMARY_ID} entities={entities} anomalies={anomalies} />
-      <EntityList entities={entities} anomalies={anomalies} onOpen={openEntity} />
-
-      {sessionId && state.schema && (
-        <SearchPanel client={client} sessionId={sessionId} onHits={(hits) => dispatch({ type: "search_results", hits })} />
-      )}
-
-      <GeneratedCodeView resurrection={state.resurrection} />
 
       <NodeInspector
         entity={selected}
@@ -230,7 +316,7 @@ function Workbench() {
         opener={opener}
         returnFocusRef={canvasRegionRef}
       />
-    </main>
+    </div>
   );
 }
 

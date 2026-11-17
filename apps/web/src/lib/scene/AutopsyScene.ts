@@ -35,9 +35,9 @@ export interface SceneOptions {
   onContextLost?(): void;
 }
 
-const TEAL = "#14B8A6";
-const AMBER = "#F59E0B";
-const HIGHLIGHT = "#FFFFFF";
+const BONE = "#EFE4CC";
+const OCHRE = "#DE9346";
+const HIGHLIGHT = "#F2C46D";
 const NODE_RADIUS = 0.5;
 const PULSE_PERIOD_S = 2;
 const MAX_PIXEL_RATIO = 2;
@@ -110,8 +110,8 @@ interface EdgeRecord {
 
 function nodeColor(severity: Severity | null): string {
   if (severity === "critical") return CRIMSON;
-  if (severity === null) return TEAL;
-  return AMBER;
+  if (severity === null) return BONE;
+  return OCHRE;
 }
 
 export class AutopsyScene {
@@ -168,7 +168,9 @@ export class AutopsyScene {
             const last = entries[entries.length - 1];
             if (!last) return;
             this.intersecting = last.isIntersecting;
-            this.syncLoop();
+            // Reduced motion has no loop, so updates made while off-screen were dropped; draw them now.
+            if (this.intersecting) this.requestRender();
+            else this.syncLoop();
           });
     this.intersectionObserver?.observe(canvas);
 
@@ -300,7 +302,7 @@ export class AutopsyScene {
       if (entity.severity === null) {
         const halo = new THREE.Mesh(
           new THREE.RingGeometry(NODE_RADIUS + 0.18, NODE_RADIUS + 0.24, 48),
-          new THREE.MeshBasicMaterial({ color: TEAL, side: THREE.DoubleSide }),
+          new THREE.MeshBasicMaterial({ color: BONE, side: THREE.DoubleSide }),
         );
         halo.lookAt(this.camera.position.clone().sub(group.position));
         group.add(halo);
@@ -458,7 +460,8 @@ export class AutopsyScene {
 
   private readonly onVisibility = (): void => {
     this.visible = document.visibilityState !== "hidden";
-    this.syncLoop();
+    if (this.visible) this.requestRender();
+    else this.syncLoop();
   };
 
   private syncLoop(): void {

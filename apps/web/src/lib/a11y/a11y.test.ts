@@ -118,8 +118,7 @@ describe("palette and focus contrast", () => {
     expect(meetsTextContrast(color, bg, true)).toBe(true);
   });
 
-  it("scene CRIMSON is graphic/large-text only (about 3.8:1, below 4.5:1 for body text)", () => {
-    expect(meetsTextContrast(CRIMSON, bg)).toBe(false);
+  it("scene CRIMSON meets 3:1 non-text contrast on the background", () => {
     expect(meetsNonTextContrast(CRIMSON, bg)).toBe(true);
   });
 

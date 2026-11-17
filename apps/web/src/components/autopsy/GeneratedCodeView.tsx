@@ -1,5 +1,6 @@
 "use client";
 import { useId } from "react";
+import { Check, Download } from "lucide-react";
 import type { ResurrectionResult } from "@/types/autopsy";
 
 export interface GeneratedCodeViewProps {
@@ -29,26 +30,28 @@ export function GeneratedCodeView({
   }
 
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} className="text-sm font-semibold">
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 id={headingId} className="font-display text-3xl uppercase leading-none tracking-notice">
           Generated FastAPI wrapper
         </h2>
         <button
           type="button"
           onClick={download}
           aria-label={`Download generated code as ${filename}`}
-          className="rounded border px-2 py-1 text-xs hover:bg-muted focus-visible:outline focus-visible:outline-2"
+          className="inline-flex h-9 items-center gap-2 rounded border border-border px-3 text-xs font-semibold text-foreground transition-colors hover:border-tallow hover:text-tallow"
         >
+          <Download aria-hidden="true" className="h-3.5 w-3.5" />
           Download generated code
         </button>
       </div>
       {syntax_ok ? (
-        <p className="text-xs" role="status">
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-verdigris" role="status">
+          <Check aria-hidden="true" className="h-3.5 w-3.5" />
           Syntax check passed.
         </p>
       ) : (
-        <p role="alert" className="text-xs font-medium text-red-500">
+        <p role="alert" className="text-xs font-semibold text-crimson-ink">
           Syntax check failed
           {syntax_error
             ? ` at line ${syntax_error.line}${
@@ -60,7 +63,7 @@ export function GeneratedCodeView({
       <pre
         tabIndex={0}
         aria-label="Generated Python source, read-only"
-        className="max-h-96 overflow-auto rounded bg-black/40 p-3 text-xs"
+        className="max-h-[28rem] overflow-auto rounded border border-border bg-[hsl(36_14%_5%)] p-4 font-mono text-[0.78rem] leading-relaxed text-foreground/90"
       >
         <code>{source}</code>
       </pre>

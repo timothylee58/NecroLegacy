@@ -1,18 +1,34 @@
 import { Info, ShieldAlert, TriangleAlert } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Severity } from "@/types/autopsy";
 
 const CONFIG = {
-  critical: { Icon: ShieldAlert, label: "Critical" },
-  medium: { Icon: TriangleAlert, label: "Medium" },
-  low: { Icon: Info, label: "Low" },
+  critical: { Icon: ShieldAlert, label: "Critical", tone: "text-crimson-ink" },
+  medium: { Icon: TriangleAlert, label: "Medium", tone: "text-ochre" },
+  low: { Icon: Info, label: "Low", tone: "text-formalin" },
 } as const;
 
-export function SeverityBadge({ severity, count }: { severity: Severity; count?: number }) {
-  const { Icon, label } = CONFIG[severity];
+export function SeverityBadge({
+  severity,
+  count,
+  className,
+}: {
+  severity: Severity;
+  count?: number;
+  className?: string;
+}) {
+  const { Icon, label, tone } = CONFIG[severity];
+  const muted = count === 0;
   return (
-    <span className="inline-flex items-center gap-1">
-      <Icon aria-hidden="true" className="h-4 w-4" />
-      <span>{count === undefined ? label : `${label}: ${count}`}</span>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-label",
+        muted ? "text-muted-foreground" : tone,
+        className,
+      )}
+    >
+      <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} />
+      <span className="tabular">{count === undefined ? label : `${label}: ${count}`}</span>
     </span>
   );
 }
