@@ -2,6 +2,8 @@
 
 NecroLegacy is a digital autopsy workbench for legacy data. It takes a fixed-width or COBOL batch dump, a copybook, or a photo of a printed table. A five-node LangGraph pipeline then infers the schema, scores statistical outliers, explains the rot and generates a FastAPI wrapper. Results appear in a Three.js "Autopsy Table", a Vision X-Ray overlay for scanned images, and a Kiro MCP server.
 
+Built for Kiroween 2026: Build with Kiro
+
 Pipeline order: `vision_extractor` (images only), `schema_archaeologist`, `ml_rot_scorer`, `rot_detector`, `api_resurrector`. Deterministic checks and the Isolation Forest run before any LLM call. LLMs explain findings and never compute scores.
 
 ## Repository layout
