@@ -172,9 +172,9 @@
     {
       "id": "23",
       "title": "Container and local environment",
-      "details": "- [ ] 23. Container and local environment\n  - [ ] 23.1 Write the root `Dockerfile`\n    - Repo-root build context (copies `sample-dumps/`), Python 3.12 slim, Tesseract, `opencv-python-headless` only, no PyTorch or CUDA, no embedding model weights (the default hash embedding needs none), uvicorn entrypoint\n    - Add `scripts/check_image_size.sh` failing and printing the measured size when the built image is at or above 1,200,000,000 bytes; if PaddleOCR pushes the image over the limit, move it to an optional extra and default the image's `OCR_ENGINE` to `tesseract`\n    - _Requirements: 4.19, 4.20, 4.21, 19.12_\n  - [ ] 23.2 Write `docker-compose.yml`\n    - Services `api`, `redis` and `pgvector/pgvector:pg16` for local development with env vars from `.env`\n    - _Requirements: 14.1, 15.1, 17.8_",
-      "done": false,
-      "notes": ""
+      "details": "- [x] 23. Container and local environment\n  - [x] 23.1 Write the root `Dockerfile`\n    - Repo-root build context (copies `sample-dumps/`), Python 3.12 slim, Tesseract, `opencv-python-headless` only, no PyTorch or CUDA, no embedding model weights (the default hash embedding needs none), uvicorn entrypoint\n    - Add `scripts/check_image_size.sh` failing and printing the measured size when the built image is at or above 1,200,000,000 bytes; if PaddleOCR pushes the image over the limit, move it to an optional extra and default the image's `OCR_ENGINE` to `tesseract`\n    - _Requirements: 4.19, 4.20, 4.21, 19.12_\n  - [x] 23.2 Write `docker-compose.yml`\n    - Services `api`, `redis` and `pgvector/pgvector:pg16` for local development with env vars from `.env`\n    - _Requirements: 14.1, 15.1, 17.8_",
+      "done": true,
+      "notes": "Dockerfile (tesseract default, PaddleOCR opt-in via WITH_PADDLE=1), check_image_size.sh, docker-compose.yml, .dockerignore. Docker daemon not running locally: compose config validated, image build and size not measured."
     },
     {
       "id": "24",

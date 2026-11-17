@@ -363,12 +363,12 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Dump `app.openapi()`, convert with `json-schema-to-typescript`, and add a `tsc` file asserting mutual assignability with `apps/web/src/types/autopsy.ts`; validate the mock event stream against the Pydantic `SessionEvent` models
     - _Requirements: 19.9_
 
-- [ ] 23. Container and local environment
-  - [ ] 23.1 Write the root `Dockerfile`
+- [x] 23. Container and local environment
+  - [x] 23.1 Write the root `Dockerfile`
     - Repo-root build context (copies `sample-dumps/`), Python 3.12 slim, Tesseract, `opencv-python-headless` only, no PyTorch or CUDA, no embedding model weights (the default hash embedding needs none), uvicorn entrypoint
     - Add `scripts/check_image_size.sh` failing and printing the measured size when the built image is at or above 1,200,000,000 bytes; if PaddleOCR pushes the image over the limit, move it to an optional extra and default the image's `OCR_ENGINE` to `tesseract`
     - _Requirements: 4.19, 4.20, 4.21, 19.12_
-  - [ ] 23.2 Write `docker-compose.yml`
+  - [x] 23.2 Write `docker-compose.yml`
     - Services `api`, `redis` and `pgvector/pgvector:pg16` for local development with env vars from `.env`
     - _Requirements: 14.1, 15.1, 17.8_
 
