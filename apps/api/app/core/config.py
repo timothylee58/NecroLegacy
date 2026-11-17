@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     rate_limit_sessions_per_hour: Annotated[int, Field(ge=1, le=10_000)] = 30
     rate_limit_searches_per_minute: Annotated[int, Field(ge=1, le=10_000)] = 30
     client_ip_header: str | None = None
+    # Rejects requests that send a wrong bearer token; requests with no Authorization header still pass,
+    # because the browser never holds the token. Abuse control is the rate limit, not this.
     api_token: SecretStr | None = None
     log_level: str = "INFO"
 

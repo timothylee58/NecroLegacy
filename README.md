@@ -87,7 +87,7 @@ Vercel runs `apps/web`. Railway runs the root `Dockerfile`. Never commit values;
 | `RATE_LIMIT_SESSIONS_PER_HOUR` | New sessions (uploads and presets) per client per hour, 1 to 10000 (default 30) | - | optional |
 | `RATE_LIMIT_SEARCHES_PER_MINUTE` | Searches per client per minute, 1 to 10000 (default 30) | - | optional |
 | `CLIENT_IP_HEADER` | Header that carries the client address, trusted only because the edge overwrites it. Set `x-real-ip` on Railway. Unset, all callers share the proxy's limit | - | recommended |
-| `API_TOKEN` | Bearer token the API requires from the MCP server when set | - | optional |
+| `API_TOKEN` | When set, the API rejects requests that send a different bearer token. Requests with no `Authorization` header are still accepted, so this is not access control; the rate limits are | - | optional |
 | `LOG_LEVEL` | Log level (default `INFO`) | - | optional |
 | `NEXT_PUBLIC_API_URL` | API base URL used by the web app | required unless mock | - |
 | `NEXT_PUBLIC_USE_MOCK` | `true` runs the web app on built-in mock data | optional | - |

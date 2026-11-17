@@ -90,7 +90,7 @@ def create_app(settings: Settings | None = None, ctx: AppContext | None = None) 
     api_token = resolved.api_token
 
     if api_token is not None:
-
+        # Wrong tokens are rejected; missing ones are allowed so the browser can call the API without a secret.
         @app.middleware("http")
         async def _auth(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
             header = request.headers.get("authorization")
