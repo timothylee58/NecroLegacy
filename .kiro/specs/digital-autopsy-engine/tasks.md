@@ -407,7 +407,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - fast-check over invalid inputs naming every invalid parameter with no `fetch` call; size, signature and missing-env rejections with no `fetch`; 404 mapping; 30 s timeout with fake timers; filter semantics
     - _Requirements: 16.2, 16.4, 16.5, 16.6, 16.7, 16.8, 16.10, 16.11_
 
-- [x] 27. Repository checks, CI and documentation
+- [ ] 27. Repository checks, CI and documentation
   - [ ] 27.1 Implement repository check scripts
     - `scripts/check_manifests.py` (fails and reports manifest and package for `opencv-python`, `torch`, `nvidia-*`, `cuda*`; requires `opencv-python-headless`), `scripts/check_presets.py` (Luhn-valid card numbers, email, phone and SSN patterns reported by file name; PNG EXIF and `tEXt/iTXt/zTXt` chunks; runs the vision extractor on the PNG and scans its text; checks the PNG is valid, at most 10 MB and at least 1,000 px wide), and a `.kiro` check that no `.gitignore` pattern ignores any file under `.kiro`
     - _Requirements: 19.5, 19.10, 19.11, 19.13, 19.3_
