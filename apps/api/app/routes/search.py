@@ -31,6 +31,7 @@ async def _query(request: Request) -> str:
 @router.post("/sessions/{session_id}/search")
 async def search(request: Request, session_id: str) -> SearchResponse:
     ctx = _ctx(request)
+    ctx.limits.enforce(ctx.limits.searches, request)
     session = get_session(request, session_id)
     query = await _query(request)
     if len(query) > 500 or not query.strip():

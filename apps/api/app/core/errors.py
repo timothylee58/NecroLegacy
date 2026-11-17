@@ -13,12 +13,20 @@ logger = logging.getLogger("necro.errors")
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, fields: list[FieldError] | None = None) -> None:
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        fields: list[FieldError] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(code)
         self.status = status
         self.code = code
         self.message = message
         self.fields = fields
+        self.headers = headers
 
 
 def error_response(status: int, code: str, message: str, fields: list[FieldError] | None = None) -> JSONResponse:
@@ -33,7 +41,9 @@ def _loc(loc: tuple[Any, ...]) -> str:
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return error_response(exc.status, exc.code, exc.message, exc.fields)
+        response = error_response(exc.status, exc.code, exc.message, exc.fields)
+        response.headers.update(exc.headers or {})
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

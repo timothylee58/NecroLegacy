@@ -76,7 +76,7 @@ Vercel runs `apps/web`. Railway runs the root `Dockerfile`. Never commit values;
 | `AWS_SESSION_TOKEN` | Temporary Bedrock credential | - | optional |
 | `LLM_BASE_URL` | Base URL of an OpenAI-compatible endpoint (`openai_compatible` only) | - | optional |
 | `LLM_API_KEY` | API key for the OpenAI-compatible endpoint | - | optional |
-| `OCR_ENGINE` | `paddleocr` (default) or `tesseract` | - | optional |
+| `OCR_ENGINE` | `tesseract` or `paddleocr`. The Docker image sets `tesseract` and installs PaddleOCR only when built with `--build-arg WITH_PADDLE=1` | - | optional |
 | `EMBEDDING_PROVIDER` | `hash` (default, local) or `api`. `api` sends record text to a third party | - | optional |
 | `EMBEDDING_API_URL` | Embedding endpoint, used when `EMBEDDING_PROVIDER=api` | - | optional |
 | `EMBEDDING_API_KEY` | Embedding endpoint key | - | optional |
@@ -84,6 +84,9 @@ Vercel runs `apps/web`. Railway runs the root `Dockerfile`. Never commit values;
 | `CACHE_TTL_SECONDS` | Cache lifetime, 60 to 604800 (default 86400) | - | optional |
 | `SANITIZER_MAX_CHARS` | Maximum characters per value sent to an LLM, 1 to 100000 (default 10000) | - | optional |
 | `MAX_CONCURRENT_SESSIONS` | Parallel pipeline runs, 1 to 8 (default 2) | - | optional |
+| `RATE_LIMIT_SESSIONS_PER_HOUR` | New sessions (uploads and presets) per client per hour, 1 to 10000 (default 30) | - | optional |
+| `RATE_LIMIT_SEARCHES_PER_MINUTE` | Searches per client per minute, 1 to 10000 (default 30) | - | optional |
+| `CLIENT_IP_HEADER` | Header that carries the client address, trusted only because the edge overwrites it. Set `x-real-ip` on Railway. Unset, all callers share the proxy's limit | - | recommended |
 | `API_TOKEN` | Bearer token the API requires from the MCP server when set | - | optional |
 | `LOG_LEVEL` | Log level (default `INFO`) | - | optional |
 | `NEXT_PUBLIC_API_URL` | API base URL used by the web app | required unless mock | - |

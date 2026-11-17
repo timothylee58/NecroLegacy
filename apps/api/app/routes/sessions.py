@@ -121,6 +121,7 @@ async def create_session(
     copybook: Annotated[UploadFile | None, File()] = None,
 ) -> CreateSessionResponse:
     ctx = _ctx(request)
+    ctx.limits.enforce(ctx.limits.sessions, request)
     try:
         data = await _read_upload(file)
         name = file.filename or ""
@@ -144,6 +145,8 @@ async def create_session(
 
 @router.post("/sessions/preset", status_code=201)
 async def create_preset_session(request: Request, body: PresetRequest) -> CreateSessionResponse:
+    limits = _ctx(request).limits
+    limits.enforce(limits.sessions, request)
     preset = get_preset(body.preset_id)
     if preset is None:
         raise ApiError(404, "not_found", "Preset not found.")

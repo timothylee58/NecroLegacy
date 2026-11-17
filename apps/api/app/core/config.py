@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     cache_ttl_seconds: Annotated[int, Field(ge=60, le=604_800)] = 86_400
     sanitizer_max_chars: Annotated[int, Field(ge=1, le=100_000)] = 10_000
     max_concurrent_sessions: Annotated[int, Field(ge=1, le=8)] = 2
+    rate_limit_sessions_per_hour: Annotated[int, Field(ge=1, le=10_000)] = 30
+    rate_limit_searches_per_minute: Annotated[int, Field(ge=1, le=10_000)] = 30
+    client_ip_header: str | None = None
     api_token: SecretStr | None = None
     log_level: str = "INFO"
 
@@ -105,6 +108,21 @@ class Settings(BaseSettings):
     @classmethod
     def _sessions(cls, v: Any) -> Any:
         return _int_in_range("MAX_CONCURRENT_SESSIONS", v, 1, 8, 2)
+
+    @field_validator("rate_limit_sessions_per_hour", mode="before")
+    @classmethod
+    def _session_rate(cls, v: Any) -> Any:
+        return _int_in_range("RATE_LIMIT_SESSIONS_PER_HOUR", v, 1, 10_000, 30)
+
+    @field_validator("rate_limit_searches_per_minute", mode="before")
+    @classmethod
+    def _search_rate(cls, v: Any) -> Any:
+        return _int_in_range("RATE_LIMIT_SEARCHES_PER_MINUTE", v, 1, 10_000, 30)
+
+    @field_validator("client_ip_header", mode="before")
+    @classmethod
+    def _ip_header(cls, v: Any) -> Any:
+        return v.strip().lower() or None if isinstance(v, str) else v
 
     @field_validator("web_origin", mode="before")
     @classmethod
