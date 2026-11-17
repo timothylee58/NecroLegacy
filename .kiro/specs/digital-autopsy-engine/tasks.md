@@ -426,7 +426,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Fails when a `Settings` field is missing from the table and passes when all are present
     - _Requirements: 19.7_
 
-- [ ] 28. Final checkpoint - Everything wired and passing
+- [x] 28. Final checkpoint - Everything wired and passing
   - Ensure all tests pass across web, API, MCP and repository checks, and that the delivery order in the task list satisfies Requirement 19.8, ask the user if questions arise.
 
 ## Task Dependency Graph

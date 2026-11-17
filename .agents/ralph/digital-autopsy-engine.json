@@ -1,5 +1,5 @@
 {
-  "complete": false,
+  "complete": true,
   "goal": "Implement every task (required and optional) in /Users/apple/NecroLegacy/.kiro/specs/digital-autopsy-engine/tasks.md, following requirements.md and design.md in the same folder.",
   "rules": [
     "Read requirements.md, design.md and tasks.md before starting an item.",
@@ -208,8 +208,8 @@
       "id": "28",
       "title": "Final checkpoint - Everything wired and passing",
       "details": "- [ ] 28. Final checkpoint - Everything wired and passing\n  - Ensure all tests pass across web, API, MCP and repository checks, and that the delivery order in the task list satisfies Requirement 19.8, ask the user if questions arise.",
-      "done": false,
-      "notes": ""
+      "done": true,
+      "notes": "tsc, lint, vitest web 133 + mcp 19, pytest 210, scripts/tests 10, ruff, mypy, import-linter, check_contract pass; playwright 17/18 in full run, the 1 s X-Ray timing test failed once under load (cold dev server) and passed on rerun (834 ms). Not run locally: docker image build and compose e2e (no daemon), GitHub CI."
     }
   ]
 }
