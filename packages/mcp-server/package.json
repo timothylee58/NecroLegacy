@@ -1,0 +1,25 @@
+{
+  "name": "@necrolegacy/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "necrolegacy-mcp": "dist/index.js" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "fast-check": "^4.10.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

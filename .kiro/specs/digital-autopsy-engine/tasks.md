@@ -389,25 +389,25 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 
 ### Phase 3: MCP server, CI and repository checks
 
-- [ ] 26. Kiro MCP server
-  - [ ] 26.1 Scaffold `packages/mcp-server`
+- [x] 26. Kiro MCP server
+  - [x] 26.1 Scaffold `packages/mcp-server`
     - `package.json` (TypeScript, Node 20, `@modelcontextprotocol/sdk`, `ajv`, Vitest, fast-check), `tsconfig.json`, `src/{index.ts,tools.ts,schemas.ts,api.ts,file-checks.ts,types.ts}`
     - _Requirements: 19.1, 16.3_
-  - [ ] 26.2 Implement schemas and file checks
+  - [x] 26.2 Implement schemas and file checks
     - `schemas.ts` with the two JSON Schemas from the design compiled by `ajv` (`allErrors: true`) and published verbatim; `file-checks.ts` with stat (regular file only), extension, size limits (`>` comparison) and image signature checks
     - _Requirements: 16.3, 16.4, 16.5, 16.6, 16.7_
-  - [ ] 26.3 Implement the API client and tools
+  - [x] 26.3 Implement the API client and tools
     - `api.ts`: env check on every call (`NECRO_API_URL`, `NECRO_API_TOKEN`, naming the missing one, no request), 30 s timeout, bearer header, `api_unavailable` mapping
     - `tools.ts`: `inspect_legacy_schema` (validate, file checks before upload, POST session, poll every 1 s until completed/failed or `MCP_ANALYSIS_TIMEOUT_MS` default 300,000, return schema with confidences, anomaly counts, failure node and code, `analysis_incomplete` with session ID on timeout) and `query_rot_anomalies` (AND filters via `GET /api/sessions/{id}/anomalies`, 404 mapped to "session not found"); all errors use `isError: true` with `{error: {code, message, parameters?}}`
     - _Requirements: 16.1, 16.2, 16.8, 16.9, 16.10, 16.11, 17.8_
-  - [ ] 26.4 Implement the stdio server entry
+  - [x] 26.4 Implement the stdio server entry
     - `index.ts` low-level `Server` with `ListTools` and `CallTool`; starts even when env variables are missing, logging the variable name to stderr and returning the 16.11 error per call
     - _Requirements: 16.3, 16.11, 17.9_
-  - [ ] 26.5 Write MCP unit and property tests
+  - [x] 26.5 Write MCP unit and property tests
     - fast-check over invalid inputs naming every invalid parameter with no `fetch` call; size, signature and missing-env rejections with no `fetch`; 404 mapping; 30 s timeout with fake timers; filter semantics
     - _Requirements: 16.2, 16.4, 16.5, 16.6, 16.7, 16.8, 16.10, 16.11_
 
-- [ ] 27. Repository checks, CI and documentation
+- [x] 27. Repository checks, CI and documentation
   - [ ] 27.1 Implement repository check scripts
     - `scripts/check_manifests.py` (fails and reports manifest and package for `opencv-python`, `torch`, `nvidia-*`, `cuda*`; requires `opencv-python-headless`), `scripts/check_presets.py` (Luhn-valid card numbers, email, phone and SSN patterns reported by file name; PNG EXIF and `tEXt/iTXt/zTXt` chunks; runs the vision extractor on the PNG and scans its text; checks the PNG is valid, at most 10 MB and at least 1,000 px wide), and a `.kiro` check that no `.gitignore` pattern ignores any file under `.kiro`
     - _Requirements: 19.5, 19.10, 19.11, 19.13, 19.3_
