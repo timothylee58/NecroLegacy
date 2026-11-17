@@ -67,7 +67,8 @@ def stream(client: TestClient, sid: str, last_id: str | None = None) -> tuple[li
     with client.stream("GET", f"/api/sessions/{sid}/events", headers=headers) as res:
         assert res.status_code == 200
         cache_header = res.headers["x-necro-cache"]
-        frames = [f for f in res.read().decode().split("\n\n") if f.strip()]
+        # Keepalive comments (": keepalive") carry no id; they appear when the pipeline runs slowly, as on CI.
+        frames = [f for f in res.read().decode().split("\n\n") if f.strip() and not f.startswith(":")]
     parsed = []
     for f in frames:
         lines = dict(line.split(": ", 1) for line in f.split("\n") if ": " in line)
@@ -99,7 +100,8 @@ def test_reconnect_with_last_event_id_resumes(client):
 
 def stream_query(client, sid, k):
     with client.stream("GET", f"/api/sessions/{sid}/events?last_event_id={k}") as res:
-        frames = [f for f in res.read().decode().split("\n\n") if f.strip()]
+        # Keepalive comments (": keepalive") carry no id; they appear when the pipeline runs slowly, as on CI.
+        frames = [f for f in res.read().decode().split("\n\n") if f.strip() and not f.startswith(":")]
     return [(int(f.split("\n")[0].split(": ")[1]), f.split("\n")[2].split(": ", 1)[1]) for f in frames], ""
 
 
