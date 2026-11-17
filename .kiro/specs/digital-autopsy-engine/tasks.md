@@ -300,7 +300,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
 - [x] 19. Checkpoint - Services complete
   - Ensure all tests pass (`pytest apps/api/tests/unit apps/api/tests/property`, `ruff`, `mypy`, import-linter), ask the user if questions arise.
 
-- [ ] 20. LangGraph state, graph and the first three nodes
+- [x] 20. LangGraph state, graph and the first three nodes
   - [x] 20.1 Implement state and graph skeleton
     - `app/agents/state.py` (`AutopsyState`, merge for `node_status`); `app/agents/graph.py` with `StateGraph`, the `instrument(name)` wrapper emitting `started`, `completed`, `failed`, `skipped` through `EventLog` only, `route` node (text: emit `vision_extractor` skipped `text_input` first; image: vision first), conditional edges to `END` on failure, `skip_resurrector` node, and a 600 s session guard
     - _Requirements: 4.1, 4.2, 5.1, 5.2, 9.9, 10.2, 10.4, 10.5, 10.11_
@@ -315,7 +315,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Store the `RecordEmbeddings` in `AutopsyState.embeddings` (internal only, kept even when every entity is skipped); embedding failure never skips the node and is reported only through the completion payload fields and one `warning` log; no Vector_Store call; add `embeddings` to `AutopsyState` in `state.py`
     - _Requirements: 6.1, 6.8, 6.9, 6.10, 6.17, 6.18, 6.20, 6.23, 6.24, 6.25, 6.26_
 
-- [ ] 21. rot_detector and api_resurrector nodes
+- [x] 21. rot_detector and api_resurrector nodes
   - [x] 21.1 Implement the `rot_detector` node
     - `app/agents/nodes/rot_detector.py`: deterministic checks (`orphan_foreign_key`, `negative_stock`, `negative_ledger_balance`, `truncated_field`, `byte_offset_overflow` with record number, actual and expected lengths, `duplicate_ledger_entry`); ML anomalies copied unchanged and classified (low if lowest score >= -0.30 else medium, confidence `round(min(1, -min/0.5), 2)`); critical for orphan FK, overflow and negative inventory with no downgrade; semantic checks within `asyncio.timeout(60)` for the 10 lowest-score rows and up to 10 orphan FKs, accepted only with rows subset of input, name `semantic_corruption`, severity at most medium; at most 5 samples; fixed template root cause for unexplained outliers; degradation when no provider or router failure; empty list for zero rows; final row-subset assertion
     - _Requirements: 3.5, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12_
