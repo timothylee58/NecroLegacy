@@ -1,6 +1,7 @@
 import type {
   Anomaly,
   CreateSessionResponse,
+  ErrorResponse,
   PresetId,
   SearchHit,
   SearchResponse,
@@ -17,7 +18,7 @@ import {
   playEvents,
   type MockDataset,
 } from "./mock-autopsy";
-import type { SessionHandlers } from "./sse-client";
+import { openSessionStream, type SessionHandlers } from "./sse-client";
 
 export type { SessionHandlers } from "./sse-client";
 
@@ -137,7 +138,114 @@ export class MockClient implements AutopsyClient {
   }
 }
 
+export const REQUEST_TIMEOUT_MS = 10_000;
+
+export class ApiRequestError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+// setTimeout rather than AbortSignal.timeout so the deadline is controllable with fake timers.
+function withTimeout(signal?: AbortSignal): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+    REQUEST_TIMEOUT_MS,
+  );
+  return {
+    signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
+    clear: () => clearTimeout(timer),
+  };
+}
+
+async function toError(res: Response): Promise<ApiRequestError> {
+  try {
+    const body = (await res.json()) as Partial<ErrorResponse>;
+    if (body.error && typeof body.error.code === "string") {
+      return new ApiRequestError(body.error.code, body.error.message ?? res.statusText, res.status);
+    }
+  } catch {
+    // Non-JSON error bodies fall through to the generic mapping.
+  }
+  return new ApiRequestError("http_error", `Request failed with status ${res.status}.`, res.status);
+}
+
+export class HttpClient implements AutopsyClient {
+  private readonly base: string;
+
+  constructor(baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "") {
+    this.base = baseUrl.replace(/\/+$/, "");
+  }
+
+  private async request(path: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+    const timeout = withTimeout(signal);
+    try {
+      const res = await fetch(`${this.base}${path}`, { ...init, signal: timeout.signal });
+      if (!res.ok) throw await toError(res);
+      return res;
+    } finally {
+      timeout.clear();
+    }
+  }
+
+  async createSession(input: SessionInput, signal?: AbortSignal): Promise<CreateSessionResponse> {
+    let res: Response;
+    if (input.kind === "preset") {
+      res = await this.request(
+        "/api/sessions/preset",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preset_id: input.preset }),
+        },
+        signal,
+      );
+    } else {
+      const form = new FormData();
+      if (input.kind === "text") {
+        form.append("file", new File([input.text], "pasted.dat", { type: "text/plain" }));
+      } else {
+        form.append("file", input.file, input.file.name);
+        if (input.copybook) form.append("copybook", input.copybook, input.copybook.name);
+      }
+      res = await this.request("/api/sessions", { method: "POST", body: form }, signal);
+    }
+    return (await res.json()) as CreateSessionResponse;
+  }
+
+  subscribe(sessionId: string, handlers: SessionHandlers, lastEventId = 0): Unsubscribe {
+    return openSessionStream(`${this.base}/api/sessions/${encodeURIComponent(sessionId)}/events`, lastEventId, handlers);
+  }
+
+  async search(sessionId: string, query: string, signal?: AbortSignal): Promise<SearchResponse> {
+    const res = await this.request(
+      `/api/sessions/${encodeURIComponent(sessionId)}/search`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query }) },
+      signal,
+    );
+    return (await res.json()) as SearchResponse;
+  }
+
+  async getAnomalies(sessionId: string, f: AnomalyFilter = {}): Promise<Anomaly[]> {
+    const params = new URLSearchParams();
+    if (f.severity) params.set("severity", f.severity);
+    if (f.entity) params.set("entity", f.entity);
+    const qs = params.size > 0 ? `?${params.toString()}` : "";
+    const res = await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/anomalies${qs}`, { method: "GET" });
+    return ((await res.json()) as { anomalies: Anomaly[] }).anomalies;
+  }
+
+  presetImageUrl(id: PresetId): string {
+    return `${this.base}/api/presets/${encodeURIComponent(id)}/image`;
+  }
+}
+
 export function createClient(): AutopsyClient {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "true") return new MockClient();
-  throw new Error("HTTP AutopsyClient is not implemented yet (task 24.1); set NEXT_PUBLIC_USE_MOCK=true.");
+  return process.env.NEXT_PUBLIC_USE_MOCK === "true" ? new MockClient() : new HttpClient();
 }

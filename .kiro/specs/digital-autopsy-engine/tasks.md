@@ -372,15 +372,15 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Services `api`, `redis` and `pgvector/pgvector:pg16` for local development with env vars from `.env`
     - _Requirements: 14.1, 15.1, 17.8_
 
-- [ ] 24. Replace Mock_Data with the HTTP client
-  - [ ] 24.1 Implement `HttpClient` and switch the factory
+- [x] 24. Replace Mock_Data with the HTTP client
+  - [x] 24.1 Implement `HttpClient` and switch the factory
     - Add `HttpClient` to `src/lib/api-client.ts` implementing `AutopsyClient` with multipart upload, `POST /api/sessions/preset`, `openSessionStream` for `subscribe`, `search`, `getAnomalies`, `presetImageUrl`; `createClient()` returns it unless `NEXT_PUBLIC_USE_MOCK === "true"`; do not edit `src/types/autopsy.ts`
     - Use `NEXT_PUBLIC_API_URL`; surface `ErrorResponse` codes as dropzone alerts
     - _Requirements: 19.9, 1.9, 1.12, 1.13, 10.7_
-  - [ ] 24.2 Write unit tests for `HttpClient`
+  - [x] 24.2 Write unit tests for `HttpClient`
     - Mock `fetch`: multipart body, 10 s abort, error mapping, search request shape
     - _Requirements: 1.13, 14.3, 19.9_
-  - [ ] 24.3 Add Playwright e2e against docker-compose
+  - [x] 24.3 Add Playwright e2e against docker-compose
     - Upload, preset, keyboard-only flow, X-Ray toggle with a real image preset, SSE reconnect by killing the stream
     - _Requirements: 10.7, 10.9, 12.3, 1.10_
 

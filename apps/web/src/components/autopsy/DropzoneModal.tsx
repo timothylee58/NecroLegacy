@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, KeyboardEvent } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { AutopsyClient, SessionInput } from "@/lib/api-client";
+import { ApiRequestError, type AutopsyClient, type SessionInput } from "@/lib/api-client";
 import { getExtension, validateFile } from "@/lib/file-validation";
 import type { CreateSessionResponse, PresetId } from "@/types/autopsy";
 
@@ -43,10 +43,13 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
         const response = await client.createSession(input, AbortSignal.timeout(UPLOAD_TIMEOUT_MS));
         onSession(response, input);
         onOpenChange(false);
-      } catch {
+      } catch (err) {
         setFailure({
           kind: "upload",
-          message: "Upload failed: the service is unreachable or did not respond within 10 seconds.",
+          message:
+            err instanceof ApiRequestError
+              ? `Upload failed (${err.code}): ${err.message}`
+              : "Upload failed: the service is unreachable or did not respond within 10 seconds.",
         });
       } finally {
         setBusy(false);
