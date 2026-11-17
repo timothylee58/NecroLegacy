@@ -301,48 +301,48 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
   - Ensure all tests pass (`pytest apps/api/tests/unit apps/api/tests/property`, `ruff`, `mypy`, import-linter), ask the user if questions arise.
 
 - [ ] 20. LangGraph state, graph and the first three nodes
-  - [ ] 20.1 Implement state and graph skeleton
+  - [x] 20.1 Implement state and graph skeleton
     - `app/agents/state.py` (`AutopsyState`, merge for `node_status`); `app/agents/graph.py` with `StateGraph`, the `instrument(name)` wrapper emitting `started`, `completed`, `failed`, `skipped` through `EventLog` only, `route` node (text: emit `vision_extractor` skipped `text_input` first; image: vision first), conditional edges to `END` on failure, `skip_resurrector` node, and a 600 s session guard
     - _Requirements: 4.1, 4.2, 5.1, 5.2, 9.9, 10.2, 10.4, 10.5, 10.11_
-  - [ ] 20.2 Implement the `vision_extractor` node
+  - [x] 20.2 Implement the `vision_extractor` node
     - `app/agents/nodes/vision_extractor.py`: run `services/vision.py` in a `ProcessPoolExecutor` with 45 s local budget (recycle pool on timeout and route to the LLM fallback as if both engines failed), fallback conditions (both engines fail, mean confidence < 0.4, grid < 2x2), 120 s node limit, failure codes `unreadable_image`, `no_table_detected`, `cell_limit_exceeded`, `vision_timeout`, `sanitize_cell` on all text, completion payload with rows, boxes, defects, skew angle and engine
     - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.8, 4.10, 4.14, 4.15, 4.16, 4.17, 4.18_
-  - [ ] 20.3 Implement the `schema_archaeologist` node
+  - [x] 20.3 Implement the `schema_archaeologist` node
     - `app/agents/nodes/archaeologist.py`: parse (copybook first when supplied), entity detection (copybook 01 records, record-type discriminator, filename stem), field boundaries from copybook or parser, names (`"{type}_{position}"` unique), narrowest type at 95% match with `type_confidence`, role table, primary key (uniqueness x completeness, none gives `field=None` and 0.0), foreign keys by containment at least 0.9, image input using grid column index as position, optional LLM assist validated by Pydantic with deterministic values kept, `RawPreview` for text, `SchemaResult` validation failure marks the node failed listing invalid fields
     - _Requirements: 2.7, 3.4, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
-  - [ ] 20.4 Implement the `ml_rot_scorer` node
+  - [x] 20.4 Implement the `ml_rot_scorer` node
     - `app/agents/nodes/ml_rot_scorer.py`: run `services/ml.py` in a process pool with a 30 s limit; whole-node `skipped` with reasons when every entity is skipped; sklearn exception gives `skipped(scoring_error)` and timeout gives `skipped(timeout)` discarding partial results; completion payload with anomalies, skipped entities, at most 5,000 points, `coordinate_source` and `embedding_fallback_reason`
     - Store the `RecordEmbeddings` in `AutopsyState.embeddings` (internal only, kept even when every entity is skipped); embedding failure never skips the node and is reported only through the completion payload fields and one `warning` log; no Vector_Store call; add `embeddings` to `AutopsyState` in `state.py`
     - _Requirements: 6.1, 6.8, 6.9, 6.10, 6.17, 6.18, 6.20, 6.23, 6.24, 6.25, 6.26_
 
 - [ ] 21. rot_detector and api_resurrector nodes
-  - [ ] 21.1 Implement the `rot_detector` node
+  - [x] 21.1 Implement the `rot_detector` node
     - `app/agents/nodes/rot_detector.py`: deterministic checks (`orphan_foreign_key`, `negative_stock`, `negative_ledger_balance`, `truncated_field`, `byte_offset_overflow` with record number, actual and expected lengths, `duplicate_ledger_entry`); ML anomalies copied unchanged and classified (low if lowest score >= -0.30 else medium, confidence `round(min(1, -min/0.5), 2)`); critical for orphan FK, overflow and negative inventory with no downgrade; semantic checks within `asyncio.timeout(60)` for the 10 lowest-score rows and up to 10 orphan FKs, accepted only with rows subset of input, name `semantic_corruption`, severity at most medium; at most 5 samples; fixed template root cause for unexplained outliers; degradation when no provider or router failure; empty list for zero rows; final row-subset assertion
     - _Requirements: 3.5, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12_
-  - [ ] 21.2 Write property test for the affected-rows subset invariant
+  - [x] 21.2 Write property test for the affected-rows subset invariant
     - **Property 5: Affected-rows subset invariant**
     - For `ml_rot_scorer` and `rot_detector` outputs including LLM anomalies from a stub router returning arbitrary row numbers: `affected_rows` is a subset of input rows and `sample_rows` is a subset of `affected_rows` with length at most 5
     - **Validates: Requirements 6.12, 7.6, 7.12**
-  - [ ] 21.3 Write property test for severity classification
+  - [x] 21.3 Write property test for severity classification
     - **Property 7: Severity classification**
     - Orphan FK, byte-offset overflow, negative stock and negative ledger balance are always critical even if a stub LLM asks for low; `statistical_outlier` is low iff lowest score >= -0.30, never critical, confidence matches the formula; each anomaly has exactly one severity
     - **Validates: Requirements 7.5, 7.7, 7.8**
-  - [ ] 21.4 Write property test for deterministic rot rules
+  - [x] 21.4 Write property test for deterministic rot rules
     - **Property 9: Deterministic rot rules**
     - Injected orphan FK, negative stock, negative balance, byte-length mismatch and duplicate each produce the matching anomaly; clean datasets produce none; zero rows yields an empty list without error
     - **Validates: Requirements 3.5, 7.2, 7.11**
-  - [ ] 21.5 Implement the `api_resurrector` node
+  - [x] 21.5 Implement the `api_resurrector` node
     - `app/agents/nodes/resurrector.py`: indexing stage first (`vector_store.index_session` handed `state.embeddings` so no record is embedded twice, and embedding any record without a vector once; failure recorded as `indexing = {status: "failed", reason}` and generation continues), then `codegen` with syntax check; syntax failure marks the node failed with line, offset and message within 2 s and keeps the source; completion payload with source, `syntax_ok`, indexing status and model names
     - Extend Property 20 with the reuse check: an embedding-call counter shows at most one embedding per record across `ml_rot_scorer` and `api_resurrector`, and coordinates do not change when the vector store is unreachable
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.8, 14.1, 14.2, 6.23, 6.25_
-  - [ ] 21.6 Wire all nodes into the graph
+  - [x] 21.6 Wire all nodes into the graph
     - Register the five nodes and `skip_resurrector` in `graph.py` with the edges from the design (rot_detector failure skips api_resurrector, ml_rot_scorer never sets `failure`), per-node timeouts from the design table
     - _Requirements: 4.1, 5.1, 6.1, 7.1, 9.1, 9.9, 10.11_
-  - [ ] 21.7 Write property test for score ranges
+  - [x] 21.7 Write property test for score ranges
     - **Property 6: Score ranges**
     - Over pipeline outputs on generated datasets and stubbed vision results, every Confidence_Score (types, keys, anomalies, OCR cells, defects, encoding, search similarity) lies in [0, 1] with at most 2 decimals where specified, and the models reject out-of-range values; Spatial_Coordinates from both coordinate sources stay finite in [-1, 1], and `MlResult` validates with and without the optional `coordinate_source` fields
     - **Validates: Requirements 2.2, 4.11, 5.4, 6.14, 6.26, 7.5, 14.5**
-  - [ ] 21.8 Write integration tests for the pipeline
+  - [x] 21.8 Write integration tests for the pipeline
     - Run each Preset through the graph with stubbed Bedrock primary and fallback models (`respx`, no real AWS calls), `fakeredis` and a fake vector store; assert event order, text session first event `vision_extractor skipped text_input`, image session with a generated skewed table, a failing node ends with `error` then `terminal`, indexing failure still generates code, an embedding provider failure yields `coordinate_source = "numeric"` in the `ml_rot_scorer` event while the run completes, process-pool timeouts (patched short) recycle the pool, and extend Property 18 over a full run
     - _Requirements: 4.2, 5.1, 6.8, 9.2, 10.5, 10.11, 14.2, 17.11_
 

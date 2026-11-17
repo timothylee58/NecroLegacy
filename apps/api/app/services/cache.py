@@ -74,9 +74,7 @@ class ResultCache:
 
     @classmethod
     def from_url(cls, url: str, ttl_seconds: Any = TTL_DEFAULT) -> "ResultCache":
-        client = Redis.from_url(
-            url, socket_timeout=REDIS_TIMEOUT_SECONDS, socket_connect_timeout=REDIS_TIMEOUT_SECONDS
-        )
+        client = Redis.from_url(url, socket_timeout=REDIS_TIMEOUT_SECONDS, socket_connect_timeout=REDIS_TIMEOUT_SECONDS)
         return cls(client, resolve_ttl(ttl_seconds))
 
     async def get(self, key: str) -> CachedResult | None:

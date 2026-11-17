@@ -347,4 +347,3 @@ class PgBackend:
 
     async def close(self) -> None:
         await self._pool.close()
-

@@ -10,7 +10,23 @@ from app.services.codegen import generate
 names = st.one_of(
     st.text(max_size=12),
     st.sampled_from(
-        ["class", "None", "1abc", 'a"b', "a'b", "line\nbreak", "model_config", "dict", "_x", "ünï", "a-b", "a b", "", "A", "a"]
+        [
+            "class",
+            "None",
+            "1abc",
+            'a"b',
+            "a'b",
+            "line\nbreak",
+            "model_config",
+            "dict",
+            "_x",
+            "ünï",
+            "a-b",
+            "a b",
+            "",
+            "A",
+            "a",
+        ]
     ),
 )
 types = st.sampled_from(["string", "integer", "decimal", "date"])

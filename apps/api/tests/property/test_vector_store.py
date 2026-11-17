@@ -35,12 +35,13 @@ class MemoryBackend:
 
     async def search(self, session_key, vector, required_empty):
         found = [
-            r
-            for r in self.rows.values()
-            if r.session_key == session_key and set(required_empty) <= set(r.empty_fields)
+            r for r in self.rows.values() if r.session_key == session_key and set(required_empty) <= set(r.empty_fields)
         ]
         found.sort(key=lambda r: -float(np.dot(r.embedding, vector)))
-        return [Match(r.entity, r.row_number, r.anomaly_flags, r.content, float(np.dot(r.embedding, vector))) for r in found[:100]]
+        return [
+            Match(r.entity, r.row_number, r.anomaly_flags, r.content, float(np.dot(r.embedding, vector)))
+            for r in found[:100]
+        ]
 
     async def purge(self, older_than_seconds):
         return None
@@ -59,7 +60,9 @@ class CountingProvider(HashEmbeddingProvider):
 
 
 cell = st.one_of(st.just(""), st.just("  "), st.text(max_size=8))
-metachar = st.sampled_from(["'; DROP TABLE record_embeddings; --", "%s %(q)s", '" OR 1=1', "missing branch codes", "\\"])
+metachar = st.sampled_from(
+    ["'; DROP TABLE record_embeddings; --", "%s %(q)s", '" OR 1=1', "missing branch codes", "\\"]
+)
 queries = st.one_of(st.text(min_size=1, max_size=40), metachar, st.just("Show all transfers with missing branch codes"))
 
 
@@ -130,7 +133,9 @@ def test_missing_branch_codes_returns_only_empty_branch():
         backend, provider = MemoryBackend(), HashEmbeddingProvider()
         store = VectorStore(backend)
         await store.index_session("s", records_for(rows), {}, provider)
-        return await store.search("s", "Show all warehouse transfers with missing branch codes", provider, FIELDS), backend
+        return await store.search(
+            "s", "Show all warehouse transfers with missing branch codes", provider, FIELDS
+        ), backend
 
     hits, backend = asyncio.run(go())
     assert {h.row_number for h in hits} <= {1, 3}

@@ -36,13 +36,18 @@ def money(value: float) -> str:
 def build_ledger(rng: random.Random) -> str:
     # Layout: type(2) id(6) name(20) branch(4) balance(12) | JE: type(2) id(6) acct(6) date(8) amount(12) memo(14)
     # Record types have different widths on purpose, so schema_archaeologist must split by prefix.
-    lines: list[str] = []
+    # One-space gutters and left-aligned values let fixed-width boundary detection find every field;
+    # without them adjacent numeric fields (account + date) are indistinguishable.
+    # Each record type starts with a header row carrying its own prefix, so field names (and the roles that
+    # drive the rot checks) survive the split by prefix.
+    lines: list[str] = [f"AC {'acct':<6} {'name':<20} {'brn':<4} {'balance':<12}"]
     acct_ids = [f"A{1000 + i * 10:05d}" for i in range(len(LEDGER_NAMES))]
     for i, aid in enumerate(acct_ids):
         balance = rng.uniform(500, 90000)
         if LEDGER_NAMES[i] == "Suspense":
             balance = -rng.uniform(100, 900)
-        lines.append(f"AC{aid:<6}{LEDGER_NAMES[i]:<20}{BRANCHES[i % 3]:<4}{money(balance):>12}")
+        lines.append(f"AC {aid:<6} {LEDGER_NAMES[i]:<20} {BRANCHES[i % 3]:<4} {money(balance):<12}")
+    lines.append(f"JE {'entry':<6} {'acct':<6} {'postdate':<8} {'amount':<12} {'memo':<14}")
     for n in range(1, 121):
         aid = rng.choice(acct_ids)
         if n in (37, 88):
@@ -51,23 +56,25 @@ def build_ledger(rng: random.Random) -> str:
         month = 1 + (n // 12) % 12
         amount = rng.uniform(20, 15000) * rng.choice([1, 1, 1, -1])
         memo = rng.choice(["BATCH POST", "MANUAL ADJ", "RECON", "ACCRUAL", "REVERSAL"])
-        lines.append(f"JE{n:06d}{aid:<6}1994{month:02d}{day:02d}{money(amount):>12}{memo:<14}")
+        lines.append(f"JE {n:06d} {aid:<6} 1994{month:02d}{day:02d} {money(amount):<12} {memo:<14}")
     for n in (14, 15):
         # Byte-for-byte duplicate of an earlier entry except for its id.
-        src = lines[len(LEDGER_NAMES) + 4]
-        lines.append(f"JE{900 + n:06d}{src[8:]}")
+        src = lines[len(LEDGER_NAMES) + 6]
+        lines.append(f"JE {900 + n:06d}{src[9:]}")
     return "\n".join(lines) + "\n"
 
 
 def build_pos(rng: random.Random) -> str:
     # Pipe-delimited so the 2-char prefix is the first field; field counts differ per record type.
-    out: list[str] = []
+    out: list[str] = ["BR|branch_code|branch_name|zone"]
     branch_codes = BRANCHES
     for code in branch_codes:
         out.append(f"BR|{code}|Warehouse {code}|{rng.choice(['DRY', 'CHILL', 'FROZEN'])}")
+    out.append("PR|sku_code|product_name|unit_price")
     skus = [f"SKU{1000 + i}" for i in range(len(PRODUCT_NAMES))]
     for sku, name in zip(skus, PRODUCT_NAMES):
         out.append(f"PR|{sku}|{name}|{money(rng.uniform(0.8, 24))}")
+    out.append("ST|stock_id|sku_code|branch_code|qty_on_hand")
     stock_id = 0
     for sku in skus:
         for code in rng.sample(branch_codes, 2):
@@ -78,6 +85,7 @@ def build_pos(rng: random.Random) -> str:
     out.append(f"ST|{stock_id + 2:05d}|{skus[9]}|S002|-120")
     out.append(f"ST|{stock_id + 3:05d}|{skus[5]}||75")
     out.append(f"ST|{stock_id + 4:05d}|SKU9999|E001|40")
+    out.append("SL|sale_id|sku_code|branch_code|sale_date|qty")
     for n in range(1, 161):
         sku = rng.choice(skus)
         code = rng.choice(branch_codes)

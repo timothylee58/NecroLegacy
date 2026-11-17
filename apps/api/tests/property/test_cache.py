@@ -16,9 +16,11 @@ def event_lists(draw):
     out = []
     for i in range(1, draw(st.integers(1, 6)) + 1):
         kind = draw(st.sampled_from(["started", "skipped", "failed"]))
-        payload = {"started": {}, "skipped": {"reason": draw(text)}, "failed": {"code": draw(text), "message": draw(text)}}[
-            kind
-        ]
+        payload = {
+            "started": {},
+            "skipped": {"reason": draw(text)},
+            "failed": {"code": draw(text), "message": draw(text)},
+        }[kind]
         out.append(
             SessionEvent(
                 id=i,
