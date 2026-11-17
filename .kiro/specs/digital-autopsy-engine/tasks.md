@@ -346,7 +346,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Run each Preset through the graph with stubbed Bedrock primary and fallback models (`respx`, no real AWS calls), `fakeredis` and a fake vector store; assert event order, text session first event `vision_extractor skipped text_input`, image session with a generated skewed table, a failing node ends with `error` then `terminal`, indexing failure still generates code, an embedding provider failure yields `coordinate_source = "numeric"` in the `ml_rot_scorer` event while the run completes, process-pool timeouts (patched short) recycle the pool, and extend Property 18 over a full run
     - _Requirements: 4.2, 5.1, 6.8, 9.2, 10.5, 10.11, 14.2, 17.11_
 
-- [ ] 22. Sessions, routes, presets and app wiring
+- [x] 22. Sessions, routes, presets and app wiring
   - [ ] 22.1 Implement sessions routes
     - `app/routes/sessions.py`: `POST /api/sessions` (multipart `file` and optional `.cpy` `copybook`, upload processing order from the design, hash, cache lookup, session creation within 2 s, background task guarded by `asyncio.Semaphore(MAX_CONCURRENT_SESSIONS)` with a queue cap of 10 giving `503 busy`), `POST /api/sessions/preset`, `GET /api/sessions/{id}/events` (SSE frames, `Last-Event-ID` header or `last_event_id` query validated as an integer in `[0, last_id]`, `X-Necro-Cache`, 15 s keepalive, terminal flush and close, replay), `GET /api/sessions/{id}`, `GET /api/sessions/{id}/anomalies` with severity and entity filters; cached sessions preload the event log and set `served_from_cache`; success caches only completed sessions
     - _Requirements: 1.7, 1.8, 1.11, 1.12, 10.1, 10.6, 10.8, 15.1, 15.2, 15.3, 15.5, 15.9, 16.2, 17.5, 17.6_

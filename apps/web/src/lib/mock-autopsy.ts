@@ -25,6 +25,7 @@ export const NODE_ORDER: readonly NodeName[] = [
 ];
 
 export const POINTS_PER_ENTITY = 600;
+const COORD_RANGE = 3.4;
 const FLAGGED_PER_ENTITY = 36;
 
 // Deterministic so fixtures are stable across renders and test runs.
@@ -97,6 +98,8 @@ function buildPoints(entity: string, seed: number, flaggedCount: number): Spatia
   const rand = mulberry32(seed);
   const jitter = (spread: number) => (rand() - 0.5) * spread;
   const points: SpatialPoint[] = [];
+  // The API normalizes PCA coordinates into [-1, 1]; the scene scales them back up.
+  const unit = (v: number) => round(Math.max(-1, Math.min(1, v / COORD_RANGE)));
   for (let i = 0; i < POINTS_PER_ENTITY; i++) {
     const flagged = i < flaggedCount;
     const cx = flagged ? 3.2 : 0;
@@ -106,9 +109,9 @@ function buildPoints(entity: string, seed: number, flaggedCount: number): Spatia
     points.push({
       entity,
       row_number: i + 1,
-      x: round(cx + jitter(spread)),
-      y: round(cy + jitter(spread)),
-      z: round(cz + jitter(spread)),
+      x: unit(cx + jitter(spread)),
+      y: unit(cy + jitter(spread)),
+      z: unit(cz + jitter(spread)),
       flagged,
       outlier_score: round(flagged ? 0.72 + rand() * 0.27 : rand() * 0.45),
     });
@@ -273,8 +276,9 @@ function buildVision(): VisionResult {
       const defect = DEFECT_AT[`${row},${col}`];
       const bbox = cellBox(row, col);
       const confidence = defect ? DEFECT_CONFIDENCE[defect] : round(0.9 + ((row * 7 + col * 3) % 9) / 100, 2);
-      cells.push({ row, col, text, bbox, confidence, smudged: defect === "smudged_digit" });
-      if (defect) defects.push({ type: defect, row, col, bbox, confidence });
+      // Grid indices are 1-based on the wire; the loop and DEFECT_AT stay 0-based.
+      cells.push({ row: row + 1, col: col + 1, text, bbox, confidence, smudged: defect === "smudged_digit" });
+      if (defect) defects.push({ type: defect, row: row + 1, col: col + 1, bbox, confidence });
     }
   }
   return {

@@ -115,7 +115,7 @@ export const FNB_DETERMINISTIC: Anomaly[] = [
     field: "dest_hub_id",
     affected_rows: ORPHAN_HUB_ROWS,
     affected_row_count: ORPHAN_HUB_ROWS.length,
-    sample_rows: ORPHAN_HUB_ROWS.map((r) => ledgerRow(r, r === 1402 ? "-00420" : "+00012", "PJ-999")),
+    sample_rows: ORPHAN_HUB_ROWS.slice(0, 5).map((r) => ledgerRow(r, r === 1402 ? "-00420" : "+00012", "PJ-999")),
     severity: "critical",
     confidence: 0.98,
     root_cause: "Hub PJ-999 is missing from MASTER_HUBS_MY; the Petaling Jaya sub-warehouse code was never migrated.",

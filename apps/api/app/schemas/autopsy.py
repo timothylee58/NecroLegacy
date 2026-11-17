@@ -348,3 +348,25 @@ class ErrorBody(Wire):
 
 class ErrorResponse(Wire):
     error: ErrorBody
+
+
+class AnomaliesResponse(Wire):
+    anomalies: list[Anomaly]
+
+
+class PresetInfo(Wire):
+    id: PresetId
+    label: str
+    kind: Literal["text", "image"]
+
+
+class PresetsResponse(Wire):
+    presets: list[PresetInfo]
+
+
+class PresetRequest(Wire):
+    preset_id: PresetId
+
+
+class HealthResponse(Wire):
+    status: Literal["ok"]

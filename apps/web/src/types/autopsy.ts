@@ -162,6 +162,13 @@ export interface MlResult {
   anomalies: Anomaly[];
   skipped_entities: SkippedEntity[];
   points: SpatialPoint[];
+  coordinate_source?: "embedding" | "numeric";
+  embedding_fallback_reason?:
+    | "provider_error"
+    | "provider_timeout"
+    | "invalid_embedding"
+    | "degenerate_embedding"
+    | null;
 }
 
 export interface RotResult {

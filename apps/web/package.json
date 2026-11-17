@@ -43,6 +43,7 @@
     "eslint-config-next": "^15.5.29",
     "fast-check": "^4.10.2",
     "jsdom": "^31.0.1",
+    "json-schema-to-typescript": "^16.0.0",
     "postcss": "^8.5.33",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
