@@ -124,6 +124,33 @@ describe("inspect_legacy_schema", () => {
     expect(parse(result).error).toMatchObject({ code: "pipeline_failed", parameters: ["rot_detector"] });
   });
 
+  it("holds the event stream open until the terminal event, then reads the result once", async () => {
+    const sse = "id: 1\nevent: node\ndata: {}\n\n: keepalive\n\nid: 9\nevent: terminal\ndata: {}\n\n";
+    const fetchMock = stubFetch((url) => {
+      if (url.endsWith("/preset")) return jsonResponse({ session_id: SESSION_ID }, 201);
+      if (url.endsWith("/events")) return new Response(sse, { headers: { "Content-Type": "text/event-stream" } });
+      return jsonResponse(completed);
+    });
+    const body = parse(await inspectLegacySchema({ preset: "1994 Mainframe Ledger Dump" }));
+    expect(body.status).toBe("completed");
+    const urls = fetchMock.mock.calls.map((c) => c[0]);
+    expect(urls).toEqual([
+      "http://api.test/api/sessions/preset",
+      `http://api.test/api/sessions/${SESSION_ID}/events`,
+      `http://api.test/api/sessions/${SESSION_ID}`,
+    ]);
+    expect((fetchMock.mock.calls[1]![1]!.headers as Record<string, string>).Authorization).toBe("Bearer test-token");
+  });
+
+  it("falls back to polling when the event stream is unavailable", async () => {
+    stubFetch((url) => {
+      if (url.endsWith("/preset")) return jsonResponse({ session_id: SESSION_ID }, 201);
+      if (url.endsWith("/events")) throw new TypeError("fetch failed");
+      return jsonResponse(completed);
+    });
+    expect(parse(await inspectLegacySchema({ preset: "1994 Mainframe Ledger Dump" })).status).toBe("completed");
+  });
+
   it("polls every second and returns analysis_incomplete with the session id at the timeout", async () => {
     vi.useFakeTimers();
     process.env.MCP_ANALYSIS_TIMEOUT_MS = "3500";
@@ -137,7 +164,9 @@ describe("inspect_legacy_schema", () => {
     const body = parse(await pending);
     expect(body.error.code).toBe("analysis_incomplete");
     expect(body.session_id).toBe(SESSION_ID);
-    expect(fetchMock.mock.calls.length).toBe(1 + 5);
+    // create, the event stream (which ends at once here), then one poll per second.
+    expect(fetchMock.mock.calls[1]![0]).toBe(`http://api.test/api/sessions/${SESSION_ID}/events`);
+    expect(fetchMock.mock.calls.length).toBe(1 + 1 + 5);
   });
 });
 

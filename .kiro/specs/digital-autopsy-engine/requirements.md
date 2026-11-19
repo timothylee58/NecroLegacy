@@ -4,7 +4,7 @@
 
 NecroLegacy is a "Digital Autopsy" workbench. It ingests 1980s-era mainframe fixed-width dumps, COBOL copybooks, legacy POS/logistics batch files, and scanned or photographed paper records (invoices, CRT screen photos and dot-matrix manifests), and runs them through a five-node LangGraph multi-agent forensic pipeline. A computer-vision layer (OpenCV preprocessing, table-grid detection and OCR with a vision-LLM fallback) turns images into structured rows. A machine-learning layer (scikit-learn IsolationForest and PCA over record embeddings) flags statistical outliers and computes 3D coordinates before any LLM sees the data. The pipeline infers the hidden schema, detects silent data rot, and synthesizes modern FastAPI REST wrappers. Results appear in an interactive Three.js 3D anatomical visualizer, and a "Vision X-Ray" overlay shows where image cells were read with low confidence or defects were detected. Records are embedded in Supabase pgvector for natural-language forensic queries, Redis caches completed analyses for replay, and a Kiro MCP server exposes the engine to Kiro IDE.
 
-The system is a monorepo: `apps/web` (Next.js 15, deployed as a Render static site), `apps/api` (FastAPI, deployed on Railway), `packages/mcp-server`, and `sample-dumps/`. Development proceeds UI-first with typed mock data, then API and SSE, then MCP.
+The system is a monorepo: `apps/web` (Next.js 15, deployed as a Render static site), `apps/api` (FastAPI, deployed as a container on Google Cloud Run), `packages/mcp-server`, and `sample-dumps/`. Development proceeds UI-first with typed mock data, then API and SSE, then MCP.
 
 ## Glossary
 
@@ -128,7 +128,7 @@ The system is a monorepo: `apps/web` (Next.js 15, deployed as a Render static si
 18. WHEN the vision_extractor completes, THE API_Service SHALL include in the completion event the structured rows, the Bounding_Boxes with text and Confidence_Scores, the Vision_Defects, the estimated skew angle, and the name of the engine that produced the text (paddleocr, tesseract, or the LLM provider).
 19. THE API_Service SHALL depend on `opencv-python-headless` only and SHALL NOT install or import the GUI package `opencv-python`.
 20. THE API_Service SHALL NOT include PyTorch or CUDA packages or model weights in its dependencies.
-21. THE API_Service Docker image built for Railway deployment SHALL have an uncompressed size below 1.2 GB (1,200,000,000 bytes).
+21. THE API_Service Docker image built for deployment SHALL have an uncompressed size below 1.2 GB (1,200,000,000 bytes).
 
 ### Requirement 5: Schema Archaeology
 
@@ -412,10 +412,10 @@ The system is a monorepo: `apps/web` (Next.js 15, deployed as a Render static si
 4. THE `apps/web` directory SHALL contain the component file `VisionXRayOverlay.tsx`.
 5. THE NecroLegacy repository SHALL track the `.kiro` directory in Git, and no pattern in any `.gitignore` file SHALL cause any file under `.kiro` to be ignored.
 6. THE NecroLegacy repository SHALL include a file named `LICENSE` at the repository root whose text is the MIT license and names a copyright holder and year.
-7. THE NecroLegacy repository SHALL document, in a README file at the repository root, the name, purpose and required or optional status of every environment variable used by the Web_App for Render deployment and by the API_Service for Railway deployment (including OCR_ENGINE), without including any secret values.
+7. THE NecroLegacy repository SHALL document, in a README file at the repository root, the name, purpose and required or optional status of every environment variable used by the Web_App for Render deployment and by the API_Service for Cloud Run deployment (including OCR_ENGINE), without including any secret values.
 8. THE NecroLegacy implementation plan SHALL order delivery as Web_App with Mock_Data first (including the Vision_X_Ray and Spatial_Coordinates rendering), then API_Service with SSE_Stream, then MCP_Server, and no task for a later item SHALL precede the tasks of an earlier item.
 9. WHEN the API_Service becomes available, THE Web_App SHALL replace Mock_Data with API_Service responses, and the TypeScript response type definitions SHALL be identical before and after the replacement, with the Web_App passing type checking with zero errors.
 10. THE Presets SHALL be synthetic data containing no real personal or financial information, including no real names, email addresses, phone numbers, government identifiers, account numbers or payment card numbers, and the image Preset SHALL contain no embedded metadata (EXIF or PNG text chunks) other than image dimensions and color information.
 11. IF a Preset file in `sample-dumps` contains a value matching a real-person identifier or a valid payment card number, THEN THE NecroLegacy repository checks SHALL fail and SHALL report the file name containing the value. For the image Preset, the checks SHALL apply to the text extracted from the image by the vision_extractor.
-12. THE API_Service Docker image built for Railway deployment SHALL have an uncompressed size below 1.2 GB (1,200,000,000 bytes), and IF the built image reaches or exceeds that size, THEN THE NecroLegacy repository build checks SHALL fail and report the measured size.
+12. THE API_Service Docker image built for deployment SHALL have an uncompressed size below 1.2 GB (1,200,000,000 bytes), and IF the built image reaches or exceeds that size, THEN THE NecroLegacy repository build checks SHALL fail and report the measured size.
 13. IF any dependency manifest of the API_Service lists `opencv-python`, `torch`, or any package whose name begins with `nvidia-` or `cuda`, THEN THE NecroLegacy repository checks SHALL fail and SHALL report the manifest and the package name. The manifest SHALL list `opencv-python-headless` for OpenCV functionality.

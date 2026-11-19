@@ -16,14 +16,14 @@ Delivery order is fixed by Requirement 19.8: **Phase 1** web app on typed mock d
 | Web | Next.js 15 App Router, React 19 function components, TypeScript `strict`, Tailwind, shadcn/ui (Radix), Framer Motion, Three.js, Vitest + Testing Library + fast-check, Playwright + `@axe-core/playwright` |
 | API | Python 3.12, FastAPI, Pydantic v2 + pydantic-settings, LangGraph `StateGraph`, httpx (LLM calls), `redis.asyncio`, `psycopg[binary,pool]` 3 + `pgvector`, `opencv-python-headless`, `numpy`, `scikit-learn`, PaddleOCR (CPU) + Tesseract, Jinja2 (codegen), pytest, pytest-asyncio, Hypothesis, respx, fakeredis |
 | MCP | TypeScript on Node 20, `@modelcontextprotocol/sdk` (stdio transport), `ajv` for input validation, Vitest + fast-check |
-| Infra | Render static site (web, `output: "export"`, `render.yaml`), Railway (api, root `Dockerfile`), Supabase Postgres + pgvector, Redis (Railway plugin), GitHub Actions |
+| Infra | Render static site (web, `output: "export"`, `render.yaml`), Google Cloud Run (api, root `Dockerfile`, one instance, request-based billing), Neon Postgres + pgvector, Upstash Redis, Groq as the OpenAI-compatible LLM endpoint, GitHub Actions (`deploy-api.yml`); see `docs/deploy-cloud-run.md` |
 
 Decisions that were open and are now closed:
 
 - **Embeddings**: one `EmbeddingProvider` abstraction (`services/embeddings.py`). The default `hash` provider is a deterministic feature-hashed embedding of the record field values (384 dims, L2-normalized, `numpy` only, no model weights, no GPU, no PyTorch, nothing added to the Docker image). An optional `api` provider calls a configured embedding endpoint (`EMBEDDING_API_URL`) and is never routed through `core/llm.py`. Rejected: `fastembed`/`BAAI/bge-small-en-v1.5` as the default (ships ONNX model weights and a build-time download, which the user replaced with the weight-free local default) and `sentence-transformers` (pulls PyTorch). The trade-off is that hashed vectors capture lexical overlap and field-value structure, not paraphrase semantics; missing-field search stays exact through `empty_fields` (14.6), and the `api` provider is the upgrade path for semantic quality. The vector size stays 384 so the `vector(384)` column is the same for both providers.
 - **Coordinates**: PCA over the record embeddings (user decision: PCA, not UMAP, so coordinates are deterministic and cheap). IsolationForest stays on the numeric columns (`contamination="auto"`, `random_state=42`, outlier iff `decision_function < -0.15`).
 - **Vector search**: exact cosine scan filtered by a btree index on `session_key`, no ANN index. 50,000 vectors of 384 floats is a few tens of milliseconds, and an HNSW index would post-filter by session and return too few rows.
-- **Session state**: in-process `SessionStore` (single Railway replica, documented). Redis stores only the completed-session event log used for caching. Rejected: Redis-backed live sessions (adds a second failure mode to every event, and 15.6 requires the pipeline to work with Redis down).
+- **Session state**: in-process `SessionStore` (single Cloud Run instance, `--max-instances 1`, documented). Redis stores only the completed-session event log used for caching. Rejected: Redis-backed live sessions (adds a second failure mode to every event, and 15.6 requires the pipeline to work with Redis down).
 - **SSE client**: a `fetch` + `ReadableStream` parser, not `EventSource`, because 10.7 requires exactly 5 attempts with 1→16 s backoff and `EventSource` controls its own retry policy.
 - **Blocking work isolation**: OpenCV/OCR and scikit-learn run in a `ProcessPoolExecutor` so the 45 s / 30 s timeouts can actually kill the work. Threads cannot be cancelled.
 - **Polling for MCP**: the MCP server polls `GET /api/sessions/{id}` rather than consuming SSE. It is simpler, and each poll is bounded by the 30 s request timeout of 16.8.
@@ -62,7 +62,7 @@ flowchart LR
     UI --> XR[VisionXRayOverlay]
     UI --> EL[EntityList / Summary / LiveAnnouncer]
   end
-  subgraph API["apps/api (Railway)"]
+  subgraph API["apps/api (Cloud Run)"]
     API[FastAPI routes] --> SS[SessionStore + EventLog]
     API --> CA[cache.py]
     API --> VS[vector_store.py]
@@ -987,7 +987,7 @@ The 18 properties above, in `apps/api/tests/property/` (Hypothesis, `max_example
 
 ### CI (`.github/workflows/ci.yml`)
 
-Jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `api` (ruff, mypy, pytest with Postgres+Redis services, import-linter), `mcp` (tsc, Vitest), `contract` (OpenAPI vs types), `repo-checks` (manifests, presets, `.kiro` ignore check, gitleaks), `image` (build the root `Dockerfile`, measure the size, run a smoke test). Deployment is by the platforms' Git integrations: Render builds `apps/web` from `render.yaml` as a static export, Railway builds the root `Dockerfile`. `docker-compose.yml` is for local development only.
+Jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `api` (ruff, mypy, pytest with Postgres+Redis services, import-linter), `mcp` (tsc, Vitest), `contract` (OpenAPI vs types), `repo-checks` (manifests, presets, `.kiro` ignore check, gitleaks), `image` (build the root `Dockerfile`, measure the size, run a smoke test). Deployment is by the platforms' Git integrations: Render builds `apps/web` from `render.yaml` as a static export, `deploy-api.yml` builds the root `Dockerfile` and deploys it to Cloud Run after CI passes. `docker-compose.yml` is for local development only.
 
 ### Delivery phases (input to the task plan, 19.8)
 

@@ -64,6 +64,28 @@ def test_client_key_reads_only_the_trusted_header():
     assert client_key(_request("203.0.113.7"), "x-real-ip") == "203.0.113.7"
 
 
+def test_client_key_uses_the_hop_the_edge_appended_last():
+    # Cloud Run appends the caller's address; spoofed entries can only appear before it.
+    req = Request(
+        {"type": "http", "headers": [(b"x-forwarded-for", b"6.6.6.6, 7.7.7.7, 203.0.113.7")], "client": ("10.0.0.9", 1)}
+    )
+    assert client_key(req, "x-forwarded-for") == "203.0.113.7"
+
+
+def test_rotating_spoofed_prefixes_still_hits_one_bucket():
+    ctx = make_ctx(rate_limit_sessions_per_hour=1, client_ip_header="x-forwarded-for")
+    with TestClient(create_app(ctx.settings, ctx)) as c:
+        codes = [
+            c.post(
+                "/api/sessions/preset",
+                json={"preset_id": "ledger_1994"},
+                headers={"x-forwarded-for": f"198.51.100.{i}, 203.0.113.7"},
+            ).status_code
+            for i in range(3)
+        ]
+    assert codes == [201, 429, 429]
+
+
 def test_client_key_falls_back_to_the_peer_when_the_header_is_missing():
     assert client_key(_request(None), "x-real-ip") == "10.0.0.9"
 

@@ -44,12 +44,13 @@ class SlidingWindowLimiter:
 
 
 def client_key(request: Request, trusted_header: str | None) -> str:
-    # Only a header the hosting edge overwrites on every request is safe; Railway does this for X-Real-IP.
-    # Without one configured, every caller behind the proxy shares the proxy's bucket, which fails closed.
+    # Only the hop the hosting edge itself adds can be trusted. Edges that append (Cloud Run's X-Forwarded-For)
+    # put it last, after anything the caller sent; edges that overwrite (Railway's X-Real-IP) send one value.
+    # Without a configured header, every caller behind the proxy shares the proxy's bucket, which fails closed.
     if trusted_header:
-        value = request.headers.get(trusted_header, "").strip()
-        if value:
-            return value
+        entries = [e.strip() for e in request.headers.get(trusted_header, "").split(",") if e.strip()]
+        if entries:
+            return entries[-1]
     return request.client.host if request.client else "unknown"
 
 

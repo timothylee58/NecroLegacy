@@ -1,0 +1,5 @@
+# Optional PaddleOCR engine. It pulls in opencv-contrib-python 4.x, which shadows the pinned OpenCV 5 headless
+# build, so it stays out of the default image and out of the test environment that must match the image.
+-r requirements.txt
+paddleocr==3.7.0
+paddlepaddle==3.3.1

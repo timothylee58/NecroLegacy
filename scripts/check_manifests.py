@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fails when a dependency manifest lists a GUI OpenCV build or GPU runtime wheels (Railway image size)."""
+"""Fails when a dependency manifest lists a GUI OpenCV build or GPU runtime wheels (API image size)."""
 import json
 import re
 import sys

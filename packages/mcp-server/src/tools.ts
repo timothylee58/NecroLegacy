@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { apiRequest, readEnv } from "./api.js";
+import { apiRequest, followEvents, readEnv } from "./api.js";
 import { checkFile } from "./file-checks.js";
 import { PRESET_IDS, invalidParameters } from "./schemas.js";
 import {
@@ -68,6 +68,7 @@ export async function inspectLegacySchema(args: unknown): Promise<ToolResult> {
     readEnv();
     const sessionId = await createSession(input);
     const deadline = Date.now() + analysisTimeout();
+    await followEvents(sessionId, deadline);
     for (;;) {
       const snapshot = (await apiRequest(`/api/sessions/${sessionId}`)) as Snapshot;
       if (snapshot.status === "completed") {

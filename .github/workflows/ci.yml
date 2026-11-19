@@ -130,14 +130,25 @@ jobs:
       - run: scripts/check_image_size.sh necrolegacy-api:latest
       - name: Smoke test
         run: |
+          # Runs as the image's non-root user with no Redis or Postgres reachable: the pipeline must still finish,
+          # which exercises tesseract, OpenCV and the worker processes inside the real container.
           docker run -d --name api -p 8000:8000 \
             -e WEB_ORIGIN=http://localhost:3000 \
             -e REDIS_URL=redis://localhost:6379/0 \
             -e SUPABASE_DB_URL=postgresql://u:p@localhost:5432/db \
             necrolegacy-api:latest
-          for i in $(seq 1 30); do
-            curl -fsS http://localhost:8000/api/health && exit 0
+          ok=""
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/health; then ok=1; break; fi
             sleep 2
           done
-          docker logs api
-          exit 1
+          [ -n "$ok" ] || { docker logs api; exit 1; }
+          test "$(docker exec api id -u)" != "0"
+          for preset in ledger_1994 dotmatrix_manifest; do
+            sid=$(curl -fsS -X POST http://localhost:8000/api/sessions/preset \
+              -H 'Content-Type: application/json' -d "{\"preset_id\": \"$preset\"}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["session_id"])')
+            curl -sN --max-time 120 "http://localhost:8000/api/sessions/$sid/events" > "/tmp/$preset.sse" || true
+            if ! grep -q '"type":"terminal".*"status":"completed"' "/tmp/$preset.sse"; then
+              echo "preset $preset did not complete"; tail -c 2000 "/tmp/$preset.sse"; docker logs api; exit 1
+            fi
+          done

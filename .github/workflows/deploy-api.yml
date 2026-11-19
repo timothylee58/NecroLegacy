@@ -1,0 +1,79 @@
+name: deploy-api
+
+# Deploys the API to Cloud Run after CI passes on main, or on demand. Skipped until the repository
+# variables from docs/deploy-cloud-run.md exist, so forks and unconfigured clones never fail on it.
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+env:
+  SERVICE: necrolegacy-api
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  REPOSITORY: necrolegacy
+
+jobs:
+  deploy:
+    if: >-
+      vars.GCP_PROJECT_ID != '' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push the image
+        id: image
+        run: |
+          image="${REGION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${REPOSITORY}/api:${GITHUB_SHA::12}"
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -t "$image" .
+          scripts/check_image_size.sh "$image"
+          docker push "$image"
+          echo "ref=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        # One instance only: live sessions are held in memory. Request-based billing (CPU only while a request is
+        # open) keeps idle time free; the browser and the MCP server both hold the event stream open while a
+        # pipeline runs, so it always has CPU. Instance-based billing would bill every idle minute.
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "$REGION" \
+            --image "${{ steps.image.outputs.ref }}" \
+            --service-account "${{ vars.GCP_RUNTIME_SA }}" \
+            --execution-environment gen2 \
+            --cpu 1 --memory 2Gi \
+            --min-instances 0 --max-instances 1 \
+            --cpu-throttling \
+            --timeout 3600 \
+            --allow-unauthenticated \
+            --set-env-vars "^@^WEB_ORIGIN=${{ vars.WEB_ORIGIN }}@LLM_PROVIDER=openai_compatible@LLM_BASE_URL=${{ vars.LLM_BASE_URL || 'https://api.groq.com/openai/v1' }}@LLM_PRIMARY_MODEL=${{ vars.LLM_PRIMARY_MODEL || 'openai/gpt-oss-120b' }}@LLM_PRIMARY_VISION=false@LLM_FALLBACK_MODEL=${{ vars.LLM_FALLBACK_MODEL }}@LLM_FALLBACK_VISION=true@CLIENT_IP_HEADER=x-forwarded-for" \
+            --set-secrets "REDIS_URL=necro-redis-url:latest,SUPABASE_DB_URL=necro-db-url:latest,LLM_API_KEY=necro-llm-key:latest"
+
+      - name: Check the live health endpoint
+        run: |
+          url=$(gcloud run services describe "$SERVICE" --project "${{ vars.GCP_PROJECT_ID }}" --region "$REGION" --format 'value(status.url)')
+          for _ in $(seq 1 20); do
+            curl -fsS "$url/api/health" && exit 0
+            sleep 3
+          done
+          exit 1

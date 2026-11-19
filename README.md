@@ -58,19 +58,19 @@ apps/api/.venv/bin/python scripts/check_readme_env.py
 
 ## Environment variables
 
-Render serves `apps/web` as a static site from `render.yaml` (free, CDN-hosted, no cold starts). Railway runs the root `Dockerfile`. Never commit values; `.env` is git-ignored.
+The free deployment runs the web app as a Render static site (`render.yaml`) and the API on Google Cloud Run, with Neon for Postgres + pgvector, Upstash for Redis and Groq for the LLM. Step-by-step setup, the reasoning behind each setting and a cost breakdown are in [docs/deploy-cloud-run.md](docs/deploy-cloud-run.md); `.github/workflows/deploy-api.yml` redeploys the API after CI passes on `main`. The API is a plain container (root `Dockerfile`), so any host with about 2 GB of memory and a single instance works. Never commit values; `.env` is git-ignored.
 
-To deploy the web app: in Render, choose **New > Blueprint**, pick this repository, and enter `NEXT_PUBLIC_API_URL` (the Railway API URL) when prompted. Then set `WEB_ORIGIN` on Railway to the Render URL, for example `https://necrolegacy-web.onrender.com`, with no trailing slash. `NEXT_PUBLIC_*` values are baked in at build time, so redeploy the site after changing them.
+`NEXT_PUBLIC_*` values are baked in at build time, so redeploy the site after changing them.
 
-| Name | Purpose | Render | Railway |
+| Name | Purpose | Render | API host |
 |---|---|---|---|
 | `WEB_ORIGIN` | Browser origin allowed by CORS (single origin, no wildcard) | - | required |
 | `REDIS_URL` | Redis connection URL for the result cache | - | required |
 | `SUPABASE_DB_URL` | Postgres URL with pgvector for record search | - | required |
-| `LLM_PROVIDER` | `bedrock` (default) or `openai_compatible` | - | optional |
-| `LLM_PRIMARY_MODEL` | Primary open-weight model id (default `openai.gpt-oss-120b-1:0`) | - | optional |
+| `LLM_PROVIDER` | `bedrock` (default) or `openai_compatible`; the free deployment uses `openai_compatible` with Groq | - | optional |
+| `LLM_PRIMARY_MODEL` | Primary open-weight model id (default `openai.gpt-oss-120b-1:0`; `openai/gpt-oss-120b` on Groq) | - | optional |
 | `LLM_PRIMARY_VISION` | `true` if the primary model accepts images (default false) | - | optional |
-| `LLM_FALLBACK_MODEL` | Fallback model id, Claude on Bedrock by default | - | optional |
+| `LLM_FALLBACK_MODEL` | Fallback model id, Claude on Bedrock by default; a vision model on Groq | - | optional |
 | `LLM_FALLBACK_VISION` | `true` if the fallback model accepts images (default true) | - | optional |
 | `AWS_REGION` | Bedrock region | - | optional |
 | `AWS_ACCESS_KEY_ID` | Bedrock credential; leave unset when using an IAM role | - | optional |
@@ -78,7 +78,7 @@ To deploy the web app: in Render, choose **New > Blueprint**, pick this reposito
 | `AWS_SESSION_TOKEN` | Temporary Bedrock credential | - | optional |
 | `LLM_BASE_URL` | Base URL of an OpenAI-compatible endpoint (`openai_compatible` only) | - | optional |
 | `LLM_API_KEY` | API key for the OpenAI-compatible endpoint | - | optional |
-| `OCR_ENGINE` | `tesseract` or `paddleocr`. The Docker image sets `tesseract` and installs PaddleOCR only when built with `--build-arg WITH_PADDLE=1` | - | optional |
+| `OCR_ENGINE` | `tesseract` or `paddleocr`. The Docker image sets `tesseract` and installs PaddleOCR (`apps/api/requirements-paddle.txt`) only when built with `--build-arg WITH_PADDLE=1` | - | optional |
 | `EMBEDDING_PROVIDER` | `hash` (default, local) or `api`. `api` sends record text to a third party | - | optional |
 | `EMBEDDING_API_URL` | Embedding endpoint, used when `EMBEDDING_PROVIDER=api` | - | optional |
 | `EMBEDDING_API_KEY` | Embedding endpoint key | - | optional |
@@ -88,7 +88,7 @@ To deploy the web app: in Render, choose **New > Blueprint**, pick this reposito
 | `MAX_CONCURRENT_SESSIONS` | Parallel pipeline runs, 1 to 8 (default 2) | - | optional |
 | `RATE_LIMIT_SESSIONS_PER_HOUR` | New sessions (uploads and presets) per client per hour, 1 to 10000 (default 30) | - | optional |
 | `RATE_LIMIT_SEARCHES_PER_MINUTE` | Searches per client per minute, 1 to 10000 (default 30) | - | optional |
-| `CLIENT_IP_HEADER` | Header that carries the client address, trusted only because the edge overwrites it. Set `x-real-ip` on Railway. Unset, all callers share the proxy's limit | - | recommended |
+| `CLIENT_IP_HEADER` | Header that carries the client address; the last comma-separated entry is used, because edges append it after anything the caller sent. `x-forwarded-for` on Cloud Run, `x-real-ip` on Railway. Unset, all callers share the proxy's limit | - | recommended |
 | `API_TOKEN` | When set, the API rejects requests that send a different bearer token. Requests with no `Authorization` header are still accepted, so this is not access control; the rate limits are | - | optional |
 | `LOG_LEVEL` | Log level (default `INFO`) | - | optional |
 | `NEXT_PUBLIC_API_URL` | API base URL used by the web app, read at build time | required unless mock | - |
@@ -97,7 +97,7 @@ To deploy the web app: in Render, choose **New > Blueprint**, pick this reposito
 | `NECRO_API_TOKEN` | Bearer token the MCP server sends (must match `API_TOKEN`) | - | - |
 | `MCP_ANALYSIS_TIMEOUT_MS` | MCP wait for an analysis, default 300000 | - | - |
 
-`NECRO_API_URL`, `NECRO_API_TOKEN` and `MCP_ANALYSIS_TIMEOUT_MS` belong to the MCP server process on the developer machine, not to Render or Railway.
+`NECRO_API_URL`, `NECRO_API_TOKEN` and `MCP_ANALYSIS_TIMEOUT_MS` belong to the MCP server process on the developer machine, not to Render or the API host.
 
 ## Kiro MCP server
 

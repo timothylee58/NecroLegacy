@@ -138,9 +138,10 @@ def estimate_skew(gray: np.ndarray) -> float:
     coords = cv2.findNonZero(binary)
     if coords is None or len(coords) < 10:
         return 0.0
-    angle = float(cv2.minAreaRect(coords)[2])
-    if angle > 45:
-        angle -= 90
+    raw = float(cv2.minAreaRect(coords)[2])
+    # OpenCV 4.x reports the rectangle angle in (0, 90] and 5.x in [-90, 0); both describe the same rotation
+    # modulo 90 degrees, so wrapping into [-45, 45) gives the same correction on either version.
+    angle = (raw + 45.0) % 90.0 - 45.0
     return max(-45.0, min(45.0, round(angle, 1)))
 
 

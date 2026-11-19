@@ -1,4 +1,4 @@
-# Render Blueprint for the web app only. The API stays on Railway (root Dockerfile).
+# Render Blueprint for the web app only. The API runs on Cloud Run (docs/deploy-cloud-run.md).
 services:
   - type: web
     runtime: static
@@ -21,7 +21,7 @@ services:
       # Corepack ships with Node 24; jsdom/undici in the workspace need Node 22.22 or newer.
       - key: NODE_VERSION
         value: "24"
-      # The Railway API URL, e.g. https://necrolegacy-api.up.railway.app. Baked in at build time.
+      # The API URL, e.g. https://necrolegacy-api-123456789012.us-central1.run.app. Baked in at build time.
       - key: NEXT_PUBLIC_API_URL
         sync: false
     headers:

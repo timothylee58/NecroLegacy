@@ -55,3 +55,42 @@ export async function apiRequest(path: string, init: RequestInit = {}): Promise<
     throw new ToolError("api_unavailable", "The API returned an unreadable response.");
   }
 }
+
+/**
+ * Holds the session's event stream open until its terminal event, the deadline, or 30 s without bytes.
+ *
+ * Hosts that allocate CPU only while a request is open (Cloud Run's default billing) would otherwise starve
+ * the pipeline between polls. Failures are swallowed: the caller still polls for the final snapshot.
+ */
+export async function followEvents(sessionId: string, deadline: number): Promise<void> {
+  const { baseUrl, token } = readEnv();
+  const controller = new AbortController();
+  let idle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const stop = setTimeout(() => controller.abort(), Math.max(0, deadline - Date.now()));
+  try {
+    const response = await fetch(`${baseUrl}/api/sessions/${sessionId}/events`, {
+      signal: controller.signal,
+      headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok || !response.body) return;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffered = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      clearTimeout(idle);
+      idle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      buffered = (buffered + decoder.decode(value, { stream: true })).slice(-4096);
+      if (/^event: terminal$/m.test(buffered)) {
+        controller.abort();
+        return;
+      }
+    }
+  } catch {
+    // Network errors, aborts and timeouts all fall back to polling.
+  } finally {
+    clearTimeout(idle);
+    clearTimeout(stop);
+  }
+}
