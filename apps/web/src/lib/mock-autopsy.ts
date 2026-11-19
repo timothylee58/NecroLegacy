@@ -198,29 +198,13 @@ export const LEDGER_ROT: RotResult = {
   error: null,
 };
 
+// Produced by apps/api/app/services/codegen.py from the three entities above, so the mock shows real output.
 export const LEDGER_RESURRECTION: ResurrectionResult = {
-  source: [
-    "from fastapi import APIRouter",
-    "from pydantic import BaseModel",
-    "",
-    "router = APIRouter()",
-    "",
-    "",
-    "class LedgerEntry(BaseModel):",
-    "    entry_id: int",
-    "    account_id: int",
-    "    amount: float",
-    "",
-    "",
-    '@router.get("/ledger-entries/{entry_id}", response_model=LedgerEntry)',
-    "def get_ledger_entry(entry_id: int) -> LedgerEntry:",
-    "    raise NotImplementedError",
-    "",
-  ].join("\n"),
+  source: "from fastapi import FastAPI\nfrom decimal import Decimal\nfrom typing import Annotated\n\nfrom fastapi import APIRouter, HTTPException\nfrom pydantic import BaseModel, Field\n\n\nclass LEDGERENTRY(BaseModel):\n    ENTRY_ID: Annotated[int, Field(gt=-100000000, lt=100000000, json_schema_extra={\"legacy_length\": 8})]\n    # orphan_foreign_key (critical)\n    ACCOUNT_ID: Annotated[int, Field(gt=-100000000, lt=100000000, json_schema_extra={\"legacy_length\": 8})]\n    POST_DATE: Annotated[str, Field(pattern='^[0-9]{2,4}[-/.]?[0-9]{2}[-/.]?[0-9]{2,4}$', json_schema_extra={\"legacy_length\": 8})]\n    AMOUNT: Annotated[Decimal, Field(max_digits=12, json_schema_extra={\"legacy_length\": 12})]\n\n\nrouter_LEDGER_ENTRY = APIRouter(prefix='/LEDGER_ENTRY', tags=['/LEDGER_ENTRY'])\nstore_LEDGER_ENTRY: dict[int, LEDGERENTRY] = {}\n\n\n@router_LEDGER_ENTRY.post(\"\", status_code=201)\ndef create_LEDGER_ENTRY(item: LEDGERENTRY) -> dict[str, object]:\n    item_id = max(store_LEDGER_ENTRY, default=0) + 1\n    store_LEDGER_ENTRY[item_id] = item\n    return {\"id\": item_id, \"item\": item}\n\n\n@router_LEDGER_ENTRY.get(\"/{item_id}\")\ndef read_LEDGER_ENTRY(item_id: int) -> LEDGERENTRY:\n    if item_id not in store_LEDGER_ENTRY:\n        raise HTTPException(status_code=404, detail=\"not found\")\n    return store_LEDGER_ENTRY[item_id]\n\n\n@router_LEDGER_ENTRY.get(\"\")\ndef list_LEDGER_ENTRY() -> list[LEDGERENTRY]:\n    return list(store_LEDGER_ENTRY.values())\n\n\n@router_LEDGER_ENTRY.put(\"/{item_id}\")\ndef update_LEDGER_ENTRY(item_id: int, item: LEDGERENTRY) -> LEDGERENTRY:\n    if item_id not in store_LEDGER_ENTRY:\n        raise HTTPException(status_code=404, detail=\"not found\")\n    store_LEDGER_ENTRY[item_id] = item\n    return item\n\n\n@router_LEDGER_ENTRY.delete(\"/{item_id}\", status_code=204)\ndef delete_LEDGER_ENTRY(item_id: int) -> None:\n    if store_LEDGER_ENTRY.pop(item_id, None) is None:\n        raise HTTPException(status_code=404, detail=\"not found\")\n\n\nclass ACCOUNT(BaseModel):\n    ACCOUNT_ID: Annotated[int, Field(gt=-100000000, lt=100000000, json_schema_extra={\"legacy_length\": 8})]\n    BRANCH_CODE: Annotated[str, Field(max_length=4, json_schema_extra={\"legacy_length\": 4})]\n    # statistical_outlier (medium)\n    BALANCE: Annotated[Decimal, Field(max_digits=12, json_schema_extra={\"legacy_length\": 12})]\n\n\nrouter_ACCOUNT = APIRouter(prefix='/ACCOUNT', tags=['/ACCOUNT'])\nstore_ACCOUNT: dict[int, ACCOUNT] = {}\n\n\n@router_ACCOUNT.post(\"\", status_code=201)\ndef create_ACCOUNT(item: ACCOUNT) -> dict[str, object]:\n    item_id = max(store_ACCOUNT, default=0) + 1\n    store_ACCOUNT[item_id] = item\n    return {\"id\": item_id, \"item\": item}\n\n\n@router_ACCOUNT.get(\"/{item_id}\")\ndef read_ACCOUNT(item_id: int) -> ACCOUNT:\n    if item_id not in store_ACCOUNT:\n        raise HTTPException(status_code=404, detail=\"not found\")\n    return store_ACCOUNT[item_id]\n\n\n@router_ACCOUNT.get(\"\")\ndef list_ACCOUNT() -> list[ACCOUNT]:\n    return list(store_ACCOUNT.values())\n\n\n@router_ACCOUNT.put(\"/{item_id}\")\ndef update_ACCOUNT(item_id: int, item: ACCOUNT) -> ACCOUNT:\n    if item_id not in store_ACCOUNT:\n        raise HTTPException(status_code=404, detail=\"not found\")\n    store_ACCOUNT[item_id] = item\n    return item\n\n\n@router_ACCOUNT.delete(\"/{item_id}\", status_code=204)\ndef delete_ACCOUNT(item_id: int) -> None:\n    if store_ACCOUNT.pop(item_id, None) is None:\n        raise HTTPException(status_code=404, detail=\"not found\")\n\n\nclass BRANCH(BaseModel):\n    BRANCH_CODE: Annotated[str, Field(max_length=4, json_schema_extra={\"legacy_length\": 4})]\n    BRANCH_NAME: Annotated[str, Field(max_length=20, json_schema_extra={\"legacy_length\": 20})]\n    HEADCOUNT: Annotated[int, Field(gt=-10000, lt=10000, json_schema_extra={\"legacy_length\": 4})]\n\n\nrouter_BRANCH = APIRouter(prefix='/BRANCH', tags=['/BRANCH'])\nstore_BRANCH: dict[int, BRANCH] = {}\n\n\n@router_BRANCH.post(\"\", status_code=201)\ndef create_BRANCH(item: BRANCH) -> dict[str, object]:\n    item_id = max(store_BRANCH, default=0) + 1\n    store_BRANCH[item_id] = item\n    return {\"id\": item_id, \"item\": item}\n\n\n@router_BRANCH.get(\"/{item_id}\")\ndef read_BRANCH(item_id: int) -> BRANCH:\n    if item_id not in store_BRANCH:\n        raise HTTPException(status_code=404, detail=\"not found\")\n    return store_BRANCH[item_id]\n\n\n@router_BRANCH.get(\"\")\ndef list_BRANCH() -> list[BRANCH]:\n    return list(store_BRANCH.values())\n\n\n@router_BRANCH.put(\"/{item_id}\")\ndef update_BRANCH(item_id: int, item: BRANCH) -> BRANCH:\n    if item_id not in store_BRANCH:\n        raise HTTPException(status_code=404, detail=\"not found\")\n    store_BRANCH[item_id] = item\n    return item\n\n\n@router_BRANCH.delete(\"/{item_id}\", status_code=204)\ndef delete_BRANCH(item_id: int) -> None:\n    if store_BRANCH.pop(item_id, None) is None:\n        raise HTTPException(status_code=404, detail=\"not found\")\n\n\napp = FastAPI()\napp.include_router(router_LEDGER_ENTRY)\napp.include_router(router_ACCOUNT)\napp.include_router(router_BRANCH)\n",
   syntax_ok: true,
   syntax_error: null,
   indexing: { status: "indexed", record_count: POINTS_PER_ENTITY * 3 },
-  models: ["LedgerEntry", "Account", "Branch"],
+  models: ["LEDGERENTRY", "ACCOUNT", "BRANCH"],
 };
 
 // ---------------------------------------------------------------- image fixture

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import re
 import time
 from collections.abc import Mapping, Sequence
@@ -49,17 +50,32 @@ SCHEMA_STATEMENTS = (
 )""",
     "CREATE INDEX IF NOT EXISTS record_embeddings_session_idx ON record_embeddings (session_key)",
     "ALTER TABLE record_embeddings ENABLE ROW LEVEL SECURITY",
+    # Added after the first release; existing rows get '' and simply never match a keyword query.
+    "ALTER TABLE record_embeddings ADD COLUMN IF NOT EXISTS keywords text NOT NULL DEFAULT ''",
 )
 UPSERT_SQL = """INSERT INTO record_embeddings
-  (session_key, entity, row_number, content, empty_fields, anomaly_flags, embedding)
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+  (session_key, entity, row_number, content, empty_fields, anomaly_flags, embedding, keywords)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (session_key, entity, row_number) DO UPDATE SET
   content = EXCLUDED.content, empty_fields = EXCLUDED.empty_fields,
-  anomaly_flags = EXCLUDED.anomaly_flags, embedding = EXCLUDED.embedding, created_at = now()"""
+  anomaly_flags = EXCLUDED.anomaly_flags, embedding = EXCLUDED.embedding,
+  keywords = EXCLUDED.keywords, created_at = now()"""
 SEARCH_SQL = """SELECT entity, row_number, anomaly_flags, content, 1 - (embedding <=> %(q)s) AS sim
 FROM record_embeddings
 WHERE session_key = %(key)s AND empty_fields @> %(fields)s::text[]
 ORDER BY embedding <=> %(q)s
+LIMIT %(limit)s"""
+# `keywords` is space-padded, so '% term %' matches whole words only. Terms are [a-z0-9]+ (see query_terms),
+# so they carry no LIKE wildcards, and they are passed as a bound array, never interpolated.
+KEYWORD_SEARCH_SQL = """SELECT entity, row_number, anomaly_flags, content, hits
+FROM (
+  SELECT entity, row_number, anomaly_flags, content,
+    (SELECT count(*) FROM unnest(%(terms)s::text[]) AS t(term) WHERE keywords LIKE '%% ' || term || ' %%') AS hits
+  FROM record_embeddings
+  WHERE session_key = %(key)s AND empty_fields @> %(fields)s::text[]
+) scored
+WHERE hits >= %(min_hits)s
+ORDER BY hits DESC, cardinality(anomaly_flags) > 0 DESC, entity, row_number
 LIMIT %(limit)s"""
 PURGE_SQL = "DELETE FROM record_embeddings WHERE created_at < now() - make_interval(secs => %s)"
 
@@ -86,6 +102,7 @@ class Row(NamedTuple):
     empty_fields: list[str]
     anomaly_flags: list[str]
     embedding: np.ndarray
+    keywords: str = ""
 
 
 class Match(NamedTuple):
@@ -100,6 +117,13 @@ class Backend(Protocol):
     async def ensure_schema(self) -> None: ...
     async def upsert(self, rows: Sequence[Row]) -> None: ...
     async def search(self, session_key: str, vector: np.ndarray, required_empty: Sequence[str]) -> list[Match]: ...
+
+    async def keyword_search(
+        self, session_key: str, terms: Sequence[str], required_empty: Sequence[str], min_hits: int
+    ) -> list[Match]:
+        """`similarity` holds the number of terms matched."""
+        ...
+
     async def purge(self, older_than_seconds: int) -> None: ...
     async def close(self) -> None: ...
 
@@ -139,6 +163,8 @@ def build_records(
 
 
 def _singular(token: str) -> str:
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
     if len(token) > 3 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
         return token[:-1]
     return token
@@ -146,6 +172,42 @@ def _singular(token: str) -> str:
 
 def _tokens(text: str) -> set[str]:
     return {_singular(t) for t in _WORD.findall(text.lower())}
+
+
+# Words that describe the request rather than the data; they would otherwise dilute every score.
+_STOPWORDS = frozenset(
+    "a about all an and any are as at be by can do every find for from get give has have how i in is it list me "
+    "my of on or please record row entry show that the their them there these this those to was what where "
+    "which who whose why with".split()
+)
+_INTENT_WORDS = frozenset({"missing", "empty", "blank", "null", "without"})
+
+
+def record_keywords(entity: str, values: Sequence[str], flags: Sequence[str]) -> str:
+    """Whole words a keyword query can match: entity name, cell values and anomaly flags.
+
+    Field names are left out on purpose: every row of an entity shares them, so they cannot rank rows.
+    """
+    words = _tokens(entity.replace("_", " "))
+    for value in values:
+        words |= _tokens(value.replace("_", " "))
+    for flag in flags:
+        words |= _tokens(flag.replace("_", " "))
+    return " " + " ".join(sorted(words)) + " "
+
+
+def query_terms(query: str, fields: Sequence[str], required_empty: Sequence[str]) -> list[str]:
+    """Discriminating words of a query: stopwords, field names and the missing-value phrase are dropped."""
+    field_words = set().union(*(_tokens(f.replace("_", " ")) for f in fields)) if fields else set()
+    consumed = set().union(*(_tokens(f.replace("_", " ")) for f in required_empty)) if required_empty else set()
+    terms: list[str] = []
+    for word in _WORD.findall(query.lower()):
+        term = _singular(word)
+        if term in _STOPWORDS or term in _INTENT_WORDS or term in field_words or term in consumed:
+            continue
+        if term not in terms:
+            terms.append(term)
+    return terms
 
 
 def analyze_query(query: str, fields: Sequence[str]) -> list[str]:
@@ -224,6 +286,7 @@ class VectorStore:
                     empty_fields=[n for n, val in zip(r.fields, r.values, strict=False) if val.strip() == ""],
                     anomaly_flags=list(r.anomaly_flags),
                     embedding=np.asarray(v, dtype=np.float32),
+                    keywords=record_keywords(r.entity, r.values, r.anomaly_flags),
                 )
             )
         try:
@@ -249,6 +312,8 @@ class VectorStore:
         if len(query) > QUERY_MAX_CHARS or not stripped:
             raise InvalidQueryError("query must be 1 to 500 characters")
         required = analyze_query(stripped, fields)
+        if provider.name == "hash":
+            return await self._keyword_search(session_key, stripped, fields, required)
         try:
             async with asyncio.timeout(SEARCH_TIMEOUT_SECONDS):
                 vector = await asyncio.to_thread(
@@ -279,6 +344,41 @@ class VectorStore:
             )
             for sim, m in hits[:SEARCH_LIMIT]
         ]
+
+    async def _keyword_search(
+        self, session_key: str, query: str, fields: Sequence[str], required: Sequence[str]
+    ) -> list[SearchHit]:
+        # The local hash embedding only encodes field=value tokens, so a plain-English query has nothing to
+        # compare against it. Sessions indexed with it are searched by whole-word overlap instead.
+        terms = query_terms(query, fields, required)
+        if not terms and not required:
+            return []
+        # A missing-value phrase is an exact filter, so it alone decides membership and other words only rank.
+        min_hits = 0 if required else max(1, math.ceil(len(terms) * SEARCH_MIN_SIMILARITY))
+        try:
+            async with asyncio.timeout(SEARCH_TIMEOUT_SECONDS):
+                matches = await self._backend.keyword_search(session_key, terms, required, min_hits)
+        except TimeoutError:
+            raise SearchUnavailableError("search timed out") from None
+        except Exception:
+            raise SearchUnavailableError("vector store unreachable") from None
+        hits = []
+        for m in matches:
+            matched = int(m.similarity)
+            if matched < min_hits:
+                continue
+            # The filter counts as one satisfied term so filter-only matches still score above zero.
+            score = (matched + 1) / (len(terms) + 1) if required else matched / len(terms)
+            hits.append(
+                SearchHit(
+                    entity=m.entity,
+                    row_number=m.row_number,
+                    similarity=round(score, 2),
+                    anomaly_flags=list(m.anomaly_flags),
+                    preview=m.content[:200],
+                )
+            )
+        return hits[:SEARCH_LIMIT]
 
     async def purge_loop(self, ttl_seconds: int, interval: float = PURGE_INTERVAL_SECONDS) -> None:
         while True:
@@ -325,7 +425,7 @@ class PgBackend:
 
     async def upsert(self, rows: Sequence[Row]) -> None:
         params = [
-            (r.session_key, r.entity, r.row_number, r.content, r.empty_fields, r.anomaly_flags, r.embedding)
+            (r.session_key, r.entity, r.row_number, r.content, r.empty_fields, r.anomaly_flags, r.embedding, r.keywords)
             for r in rows
         ]
         async with self._pool.connection() as conn, conn.cursor() as cur:
@@ -337,6 +437,22 @@ class PgBackend:
         async with self._pool.connection() as conn, conn.transaction():
             await conn.execute(f"SET LOCAL statement_timeout = {STATEMENT_TIMEOUT_MS}")
             cur = await conn.execute(SEARCH_SQL, params)
+            rows = await cur.fetchall()
+        return [Match(r[0], int(r[1]), list(r[2]), r[3], float(r[4])) for r in rows]
+
+    async def keyword_search(
+        self, session_key: str, terms: Sequence[str], required_empty: Sequence[str], min_hits: int
+    ) -> list[Match]:
+        params = {
+            "terms": list(terms),
+            "key": session_key,
+            "fields": list(required_empty),
+            "min_hits": min_hits,
+            "limit": SEARCH_LIMIT,
+        }
+        async with self._pool.connection() as conn, conn.transaction():
+            await conn.execute(f"SET LOCAL statement_timeout = {STATEMENT_TIMEOUT_MS}")
+            cur = await conn.execute(KEYWORD_SEARCH_SQL, params)
             rows = await cur.fetchall()
         return [Match(r[0], int(r[1]), list(r[2]), r[3], float(r[4])) for r in rows]
 

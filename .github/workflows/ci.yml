@@ -63,6 +63,8 @@ jobs:
       - run: mypy app
       - run: lint-imports
       - run: pytest -q
+        env:
+          NECRO_TEST_PG_URL: postgresql://postgres:postgres@localhost:5432/necrolegacy
 
   mcp:
     runs-on: ubuntu-latest

@@ -139,6 +139,18 @@ def test_missing_branch_codes_search_returns_only_empty_branch(monkeypatch):
         check_missing_branch(client)
 
 
+def test_missing_branch_codes_search_with_the_default_provider(client):
+    # The production default; the FlatProvider test above cannot catch a provider that matches nothing.
+    check_missing_branch(client)
+
+
+def test_plain_english_search_with_the_default_provider_finds_flagged_rows(client):
+    sid, _ = run_preset(client, "fnb_pos_corrupted")
+    stream(client, sid)
+    hits = client.post(f"/api/sessions/{sid}/search", json={"query": "negative stock"}).json()["hits"]
+    assert hits and all("negative_stock" in h["anomaly_flags"] for h in hits)
+
+
 def check_missing_branch(client):
     sid, _ = run_preset(client, "fnb_pos_corrupted")
     stream(client, sid)

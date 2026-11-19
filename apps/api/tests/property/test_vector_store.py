@@ -43,6 +43,17 @@ class MemoryBackend:
             for r in found[:100]
         ]
 
+    async def keyword_search(self, session_key, terms, required_empty, min_hits):
+        scored = []
+        for r in self.rows.values():
+            if r.session_key != session_key or not set(required_empty) <= set(r.empty_fields):
+                continue
+            hits = sum(1 for t in terms if f" {t} " in r.keywords)
+            if hits >= min_hits:
+                scored.append((hits, r))
+        scored.sort(key=lambda t: (-t[0], not t[1].anomaly_flags, t[1].entity, t[1].row_number))
+        return [Match(r.entity, r.row_number, r.anomaly_flags, r.content, float(h)) for h, r in scored[:100]]
+
     async def purge(self, older_than_seconds):
         return None
 
@@ -138,7 +149,8 @@ def test_missing_branch_codes_returns_only_empty_branch():
         ), backend
 
     hits, backend = asyncio.run(go())
-    assert {h.row_number for h in hits} <= {1, 3}
+    # Exactly the empty-branch rows: a subset check alone passed when search returned nothing.
+    assert {h.row_number for h in hits} == {1, 3}
     assert all("branch_code" in backend.rows[("s", h.entity, h.row_number)].empty_fields for h in hits)
 
 

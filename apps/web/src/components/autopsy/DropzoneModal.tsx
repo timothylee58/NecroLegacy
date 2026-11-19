@@ -17,8 +17,8 @@ export interface DropzoneModalProps {
 }
 
 export const PRESETS: ReadonlyArray<{ id: PresetId; label: string; meta: string }> = [
-  { id: "ledger_1994", label: "1994 Mainframe Ledger Dump", meta: "mainframe_ledger_1994.dat · fixed-width ledger" },
-  { id: "fnb_pos_corrupted", label: "Corrupted F&B Warehouse POS Batch", meta: "fnb_pos_corrupted_batch.txt · POS batch" },
+  { id: "ledger_1994", label: "1994 Mainframe Ledger Dump", meta: "1994_mainframe_ledger_dump.dat · fixed-width ledger" },
+  { id: "fnb_pos_corrupted", label: "Corrupted F&B Warehouse POS Batch", meta: "corrupted_fnb_warehouse_pos_batch.txt · POS batch" },
   { id: "dotmatrix_manifest", label: "Faded Dot-Matrix Manifest", meta: "faded_dotmatrix_manifest.png · scanned manifest" },
 ];
 
