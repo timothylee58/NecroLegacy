@@ -8,6 +8,10 @@ if (!process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_USE_MOCK !== "tr
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The browser talks to the API directly, so the site ships as static files (Render static site).
+  output: "export",
+  // Directory-style output (perf-harness/index.html) is served by any static host without rewrites.
+  trailingSlash: true,
 };
 
 export default nextConfig;

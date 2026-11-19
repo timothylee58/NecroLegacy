@@ -418,7 +418,7 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - `.github/workflows/ci.yml` jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `api` (ruff, mypy, pytest with Postgres and Redis services, import-linter), `mcp` (tsc, Vitest), `contract` (OpenAPI vs types), `repo-checks` (manifests, presets, `.kiro` ignore, gitleaks, README variable check), `image` (build, size gate, smoke test)
     - _Requirements: 19.12, 19.13, 17.7, 4.21_
   - [x] 27.4 Write the README and verify LICENSE
-    - `README.md` with project overview, monorepo layout, local run steps, the environment variable table (name, purpose, required or optional for Vercel and Railway, no secret values, including `OCR_ENGINE` and the `EMBEDDING_*` settings, with a note that `EMBEDDING_PROVIDER=api` sends record text to a third party), and a Kiro `mcp.json` example for the MCP server
+    - `README.md` with project overview, monorepo layout, local run steps, the environment variable table (name, purpose, required or optional for Render and Railway, no secret values, including `OCR_ENGINE` and the `EMBEDDING_*` settings, with a note that `EMBEDDING_PROVIDER=api` sends record text to a third party), and a Kiro `mcp.json` example for the MCP server
     - Confirm `LICENSE` is the MIT text naming a copyright holder and year and fix it if not
     - Add a script run in CI that fails when a `Settings` field is not documented in the README table
     - _Requirements: 19.6, 19.7, 17.10_

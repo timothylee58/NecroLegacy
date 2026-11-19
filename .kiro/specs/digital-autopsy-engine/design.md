@@ -16,7 +16,7 @@ Delivery order is fixed by Requirement 19.8: **Phase 1** web app on typed mock d
 | Web | Next.js 15 App Router, React 19 function components, TypeScript `strict`, Tailwind, shadcn/ui (Radix), Framer Motion, Three.js, Vitest + Testing Library + fast-check, Playwright + `@axe-core/playwright` |
 | API | Python 3.12, FastAPI, Pydantic v2 + pydantic-settings, LangGraph `StateGraph`, httpx (LLM calls), `redis.asyncio`, `psycopg[binary,pool]` 3 + `pgvector`, `opencv-python-headless`, `numpy`, `scikit-learn`, PaddleOCR (CPU) + Tesseract, Jinja2 (codegen), pytest, pytest-asyncio, Hypothesis, respx, fakeredis |
 | MCP | TypeScript on Node 20, `@modelcontextprotocol/sdk` (stdio transport), `ajv` for input validation, Vitest + fast-check |
-| Infra | Vercel (web), Railway (api, root `Dockerfile`), Supabase Postgres + pgvector, Redis (Railway plugin), GitHub Actions |
+| Infra | Render static site (web, `output: "export"`, `render.yaml`), Railway (api, root `Dockerfile`), Supabase Postgres + pgvector, Redis (Railway plugin), GitHub Actions |
 
 Decisions that were open and are now closed:
 
@@ -52,7 +52,7 @@ Decisions that were open and are now closed:
 
 ```mermaid
 flowchart LR
-  subgraph Browser["apps/web (Vercel)"]
+  subgraph Browser["apps/web (Render static site)"]
     DZ[DropzoneModal] --> CL[AutopsyClient]
     CL -->|mock| MK[mock-autopsy.ts]
     CL -->|http + fetch SSE| API
@@ -987,7 +987,7 @@ The 18 properties above, in `apps/api/tests/property/` (Hypothesis, `max_example
 
 ### CI (`.github/workflows/ci.yml`)
 
-Jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `api` (ruff, mypy, pytest with Postgres+Redis services, import-linter), `mcp` (tsc, Vitest), `contract` (OpenAPI vs types), `repo-checks` (manifests, presets, `.kiro` ignore check, gitleaks), `image` (build the root `Dockerfile`, measure the size, run a smoke test). Deployment is by the platforms' Git integrations: Vercel builds `apps/web`, Railway builds the root `Dockerfile`. `docker-compose.yml` is for local development only.
+Jobs: `web` (pnpm install, `tsc --noEmit`, lint, Vitest, build, Playwright), `api` (ruff, mypy, pytest with Postgres+Redis services, import-linter), `mcp` (tsc, Vitest), `contract` (OpenAPI vs types), `repo-checks` (manifests, presets, `.kiro` ignore check, gitleaks), `image` (build the root `Dockerfile`, measure the size, run a smoke test). Deployment is by the platforms' Git integrations: Render builds `apps/web` from `render.yaml` as a static export, Railway builds the root `Dockerfile`. `docker-compose.yml` is for local development only.
 
 ### Delivery phases (input to the task plan, 19.8)
 

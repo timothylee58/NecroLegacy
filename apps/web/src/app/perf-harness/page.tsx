@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
-import { PerfHarness } from "@/components/dev/PerfHarness";
+import { Suspense } from "react";
+import { PerfHarnessRoute } from "@/components/dev/PerfHarnessRoute";
 
 // Test-only route for the rendering budget e2e test; it does not exist outside mock mode.
-export default async function PerfHarnessPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+export default function PerfHarnessPage() {
   if (process.env.NEXT_PUBLIC_USE_MOCK !== "true") notFound();
-  const { mode } = await searchParams;
-  return <PerfHarness mode={mode === "scene" ? "scene" : "xray"} />;
+  return (
+    <Suspense fallback={null}>
+      <PerfHarnessRoute />
+    </Suspense>
+  );
 }

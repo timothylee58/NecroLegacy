@@ -58,9 +58,11 @@ apps/api/.venv/bin/python scripts/check_readme_env.py
 
 ## Environment variables
 
-Vercel runs `apps/web`. Railway runs the root `Dockerfile`. Never commit values; `.env` is git-ignored.
+Render serves `apps/web` as a static site from `render.yaml` (free, CDN-hosted, no cold starts). Railway runs the root `Dockerfile`. Never commit values; `.env` is git-ignored.
 
-| Name | Purpose | Vercel | Railway |
+To deploy the web app: in Render, choose **New > Blueprint**, pick this repository, and enter `NEXT_PUBLIC_API_URL` (the Railway API URL) when prompted. Then set `WEB_ORIGIN` on Railway to the Render URL, for example `https://necrolegacy-web.onrender.com`, with no trailing slash. `NEXT_PUBLIC_*` values are baked in at build time, so redeploy the site after changing them.
+
+| Name | Purpose | Render | Railway |
 |---|---|---|---|
 | `WEB_ORIGIN` | Browser origin allowed by CORS (single origin, no wildcard) | - | required |
 | `REDIS_URL` | Redis connection URL for the result cache | - | required |
@@ -89,13 +91,13 @@ Vercel runs `apps/web`. Railway runs the root `Dockerfile`. Never commit values;
 | `CLIENT_IP_HEADER` | Header that carries the client address, trusted only because the edge overwrites it. Set `x-real-ip` on Railway. Unset, all callers share the proxy's limit | - | recommended |
 | `API_TOKEN` | When set, the API rejects requests that send a different bearer token. Requests with no `Authorization` header are still accepted, so this is not access control; the rate limits are | - | optional |
 | `LOG_LEVEL` | Log level (default `INFO`) | - | optional |
-| `NEXT_PUBLIC_API_URL` | API base URL used by the web app | required unless mock | - |
-| `NEXT_PUBLIC_USE_MOCK` | `true` runs the web app on built-in mock data | optional | - |
+| `NEXT_PUBLIC_API_URL` | API base URL used by the web app, read at build time | required unless mock | - |
+| `NEXT_PUBLIC_USE_MOCK` | `true` runs the web app on built-in mock data. Leave unset in production | optional | - |
 | `NECRO_API_URL` | API base URL used by the MCP server | - | - |
 | `NECRO_API_TOKEN` | Bearer token the MCP server sends (must match `API_TOKEN`) | - | - |
 | `MCP_ANALYSIS_TIMEOUT_MS` | MCP wait for an analysis, default 300000 | - | - |
 
-`NECRO_API_URL`, `NECRO_API_TOKEN` and `MCP_ANALYSIS_TIMEOUT_MS` belong to the MCP server process on the developer machine, not to Vercel or Railway.
+`NECRO_API_URL`, `NECRO_API_TOKEN` and `MCP_ANALYSIS_TIMEOUT_MS` belong to the MCP server process on the developer machine, not to Render or Railway.
 
 ## Kiro MCP server
 
