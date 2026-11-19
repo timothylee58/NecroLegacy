@@ -394,6 +394,7 @@ class VectorStore:
 
 class PgBackend:
     def __init__(self, dsn: str, pool: Any | None = None) -> None:
+        owns_pool = pool is None
         if pool is None:
             from psycopg_pool import AsyncConnectionPool
 
@@ -407,6 +408,7 @@ class PgBackend:
                 configure=self._configure,
             )
         self._pool = pool
+        self._dsn = dsn if owns_pool else None
 
     @staticmethod
     async def _configure(conn: Any) -> None:
@@ -415,6 +417,13 @@ class PgBackend:
         await register_vector_async(conn)
 
     async def open(self) -> None:
+        # Every pooled connection registers the vector type, which fails until the extension exists, so a fresh
+        # database must get the extension over a plain connection first or the schema step could never run.
+        if self._dsn is not None:
+            import psycopg
+
+            async with await psycopg.AsyncConnection.connect(self._dsn, autocommit=True) as conn:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         await self._pool.open()
 
     async def ensure_schema(self) -> None:
