@@ -176,9 +176,40 @@ def _detect_field_delimiter(lines: list[str]) -> FieldDelimiter | None:
         if mode < 2:
             continue
         share = counts.count(mode) / len(counts)
-        if share >= 0.9 and (best is None or share > best[0]):
+        if share < 0.9:
+            share = _per_type_share(sample, cand) * 0.99  # a single consistent shape wins ties
+        if share >= 0.9 * 0.99 and (best is None or share > best[0]):
             best = (share, cand)
     return best[1] if best else None
+
+
+MAX_RECORD_TYPES = 50
+
+
+def _per_type_share(lines: list[str], delimiter: str) -> float:
+    """Share of lines matching the field count of their record type (first field).
+
+    Multi-record batches (header, detail, trailer lines) use one delimiter with a different field count per
+    record type, so no single count reaches 90% even though every line is cleanly delimited.
+    """
+    if sum(1 for ln in lines if delimiter in ln) < 0.9 * len(lines):
+        return 0.0
+    by_type: dict[str, list[int]] = {}
+    for ln in lines:
+        parts = _split_delimited(ln, delimiter)
+        if parts is None:
+            return 0.0
+        by_type.setdefault(parts[0].strip(), []).append(len(parts))
+    # Free text that merely contains the delimiter yields a distinct "type" on almost every line.
+    if len(by_type) > min(MAX_RECORD_TYPES, max(1, len(lines) // 5)):
+        return 0.0
+    matching = 0
+    for counts in by_type.values():
+        mode = _mode(counts)
+        if mode < 2:
+            return 0.0
+        matching += counts.count(mode)
+    return matching / len(lines)
 
 
 def _is_numeric(value: str) -> bool:

@@ -21,6 +21,7 @@ import { GeneratedCodeView } from "./GeneratedCodeView";
 import { LiveAnnouncer, useAnnounce } from "./LiveAnnouncer";
 import { NodeInspector } from "./NodeInspector";
 import { ProgressRail } from "./ProgressRail";
+import { RawDumpPanel } from "./RawDumpPanel";
 import { SearchPanel } from "./SearchPanel";
 import { VisionXRayOverlay } from "./VisionXRayOverlay";
 
@@ -297,6 +298,11 @@ function Workbench() {
 
       {sessionId && (state.schema || state.resurrection) && (
         <div className="border-t border-border">
+          {state.schema?.raw_preview && (
+            <div className="mx-auto w-full max-w-[96rem] px-4 pt-10 md:px-8">
+              <RawDumpPanel preview={state.schema.raw_preview} />
+            </div>
+          )}
           <div className="mx-auto grid w-full max-w-[96rem] gap-x-10 gap-y-12 px-4 py-10 md:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
             {state.schema ? (
               <SearchPanel client={client} sessionId={sessionId} onHits={(hits) => dispatch({ type: "search_results", hits })} />

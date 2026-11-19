@@ -101,3 +101,19 @@ def test_uncertain_encoding_flag():
     result = parse(data)
     assert result.layout.encoding == "utf-8"
     assert result.encoding_uncertain is True
+
+
+def test_multi_record_batch_detects_the_shared_delimiter():
+    # Header, stock and sale lines carry 4, 5 and 6 fields: no single count reaches 90% of lines.
+    lines = ["BR|branch_code|branch_name|zone"] + [f"BR|N00{i}|Warehouse N00{i}|DRY" for i in range(5)]
+    lines += ["ST|stock_id|sku_code|branch_code|qty"] + [f"ST|{i:05d}|SKU{i}|N001|{i}" for i in range(10)]
+    lines += ["SL|sale_id|sku_code|branch_code|sale_date|qty"] + [f"SL|{i:06d}|SKU1|N001|19940101|2" for i in range(40)]
+    result = parse(("\n".join(lines) + "\n").encode())
+    assert result.layout.field_delimiter == "|"
+    assert result.preview[1].fields == ["BR", "N000", "Warehouse N000", "DRY"]
+
+
+def test_prose_with_commas_is_not_treated_as_delimited():
+    # Every line has commas, so only the record-type guard (a distinct first field per line) rejects it.
+    lines = [f"Entry {i} was posted late, then reversed{', twice' * (i % 3)}, by clerk {i % 7}." for i in range(60)]
+    assert parse(("\n".join(lines) + "\n").encode()).layout.field_delimiter is None

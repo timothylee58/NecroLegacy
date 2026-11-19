@@ -116,8 +116,10 @@ def _model_field_name(name: str, taken: set[str]) -> str:
 
 
 def _pascal(ident: str) -> str:
+    # Mainframe names are all caps: LEDGER_ENTRY becomes LedgerEntry, while short codes such as AC stay acronyms.
     parts = [p for p in ident.split("_") if p]
-    return "".join(p[:1].upper() + p[1:] for p in parts) or "Entity"
+    words = [p.capitalize() if p.isupper() and len(p) > 3 else p[:1].upper() + p[1:] for p in parts]
+    return "".join(words) or "Entity"
 
 
 def _annotation(field: SchemaField) -> str:
@@ -154,6 +156,7 @@ def check_syntax(source: str) -> SyntaxErrorInfo | None:
 def render(entities: Sequence[Entity], anomalies: Sequence[Anomaly] = ()) -> str:
     class_names: set[str] = set()
     idents: set[str] = set()
+    prefixes: set[str] = set()
     views = []
     commented_entities: set[str] = set()
     for entity in entities:
@@ -161,8 +164,10 @@ def render(entities: Sequence[Entity], anomalies: Sequence[Anomaly] = ()) -> str
         first_entity = entity.name not in commented_entities
         commented_entities.add(entity.name)
         commented_fields: set[str] = set()
-        ident = safe_identifier(entity.name, idents, _TEMPLATE_NAMES)
-        cls = safe_identifier(_pascal(ident), class_names, _TEMPLATE_NAMES | _BASEMODEL_ATTRIBUTES)
+        ident = safe_identifier(entity.name.lower(), idents, _TEMPLATE_NAMES)
+        cls = safe_identifier(
+            _pascal(safe_identifier(entity.name)), class_names, _TEMPLATE_NAMES | _BASEMODEL_ATTRIBUTES
+        )
         field_names: set[str] = set()
         fields = []
         for f in entity.fields:
@@ -179,13 +184,19 @@ def render(entities: Sequence[Entity], anomalies: Sequence[Anomaly] = ()) -> str
                     "comments": comments,
                 }
             )
+        prefix = base = "/" + (ident.strip("_").replace("_", "-") or ident)
+        n = 2
+        # `_a` and `a` are distinct identifiers but would share the URL `/a`.
+        while prefix in prefixes:
+            prefix, n = f"{base}-{n}", n + 1
+        prefixes.add(prefix)
         views.append(
             {
                 "ident": ident,
                 "cls": cls,
                 "router": f"router_{ident}",
                 "store": f"store_{ident}",
-                "prefix": repr(f"/{ident}"),
+                "prefix": repr(prefix),
                 "fields": fields,
             }
         )
