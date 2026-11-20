@@ -133,5 +133,7 @@ handful of Redis commands.
 | Render static site | none | free | — |
 
 When Groq's daily limit runs out, autopsies still finish: the deterministic and ML findings are unaffected and the
-LLM explanations are marked skipped. For comparison, the Bedrock setup costs about $0.002 per autopsy with
+LLM explanations are marked skipped. The faded dot-matrix preset reads poorly with tesseract (mean confidence about
+0.35), so it asks the vision model first; if that model is missing, rate-limited or returns nothing, the API keeps
+the local OCR cells and the Vision X-Ray marks most of them low-confidence. For comparison, the Bedrock setup costs about $0.002 per autopsy with
 `gpt-oss-120b` and about $0.03 to $0.07 when the Claude Sonnet 4.5 fallback answers.

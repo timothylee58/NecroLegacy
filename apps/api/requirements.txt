@@ -9,7 +9,7 @@ psycopg==3.3.9
 psycopg-binary==3.3.9
 psycopg-pool==3.3.3
 pgvector==0.5.1
-opencv-python-headless==5.0.0.93
+opencv-python-headless==4.10.0.84
 numpy==2.3.5
 scikit-learn==1.9.1
 pytesseract==0.3.13

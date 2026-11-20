@@ -29,16 +29,13 @@ async def run(state: AutopsyState, deps: Deps) -> Completed:
         raise NodeError(exc.code, exc.message) from None
 
     if local is not None and local.needs_fallback is None:
-        assert local.engine is not None
-        result = VisionResult(
-            image_width=local.image_width,
-            image_height=local.image_height,
-            skew_angle_degrees=local.skew_angle_degrees,
-            engine=local.engine,
-            cells=local.cells,
-            defects=local.defects,
-        )
-        return Completed(result, {"vision": result})
+        confident = _local_result(local)
+        return Completed(confident, {"vision": confident})
+
+    # A detected grid whose OCR is merely unsure is still evidence: if the vision LLM cannot do better, keep it.
+    # The X-Ray marks every cell below the confidence threshold, so nothing is passed off as certain (4.14 reserves
+    # no_table_detected for images where no table was found).
+    keep = local if local is not None and local.needs_fallback == "low_confidence" and local.cells else None
 
     gray = local.image if local is not None and local.image is not None else None
     if gray is None:
@@ -47,14 +44,35 @@ async def run(state: AutopsyState, deps: Deps) -> Completed:
         except vision.VisionError as exc:
             raise NodeError(exc.code, exc.message) from None
     if not deps.router.has_provider():
-        raise NodeError("no_table_detected", NO_TABLE)
+        return _keep_or_fail(keep)
     try:
         result = await extract_with_llm(deps.router, gray, BusEventSink(deps.bus))
     except ProviderFailure:
-        raise NodeError("no_table_detected", NO_TABLE) from None
+        return _keep_or_fail(keep)
     except vision.VisionError as exc:
-        code = exc.code if exc.code == "cell_limit_exceeded" else "no_table_detected"
-        raise NodeError(code, exc.message if code != "no_table_detected" else NO_TABLE) from None
+        if exc.code == "cell_limit_exceeded":
+            raise NodeError(exc.code, exc.message) from None
+        return _keep_or_fail(keep)
     if not result.cells:
+        return _keep_or_fail(keep)
+    return Completed(result, {"vision": result})
+
+
+def _local_result(local: vision.LocalVision) -> VisionResult:
+    assert local.engine is not None
+    return VisionResult(
+        image_width=local.image_width,
+        image_height=local.image_height,
+        skew_angle_degrees=local.skew_angle_degrees,
+        engine=local.engine,
+        cells=local.cells,
+        defects=local.defects,
+    )
+
+
+def _keep_or_fail(keep: vision.LocalVision | None) -> Completed:
+    if keep is None:
         raise NodeError("no_table_detected", NO_TABLE)
+    logger.warning("vision LLM unavailable or empty; keeping %d low-confidence OCR cells", len(keep.cells))
+    result = _local_result(keep)
     return Completed(result, {"vision": result})

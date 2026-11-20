@@ -5,7 +5,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+import cv2
 import httpx
+import numpy as np
 import pytest
 import respx
 
@@ -14,12 +16,12 @@ from app.agents.nodes import ml_rot_scorer, rot_detector
 from app.agents.nodes.base import PoolTimeout
 from app.agents.runtime import Timeouts, WorkerPool
 from app.agents.state import RawInput
-from app.core.llm import LLMRouter
+from app.core.llm import LLMRouter, ProviderFailure
 from app.schemas.autopsy import NODE_ORDER
 from app.services import vision
 from app.services.vector_store import VectorStore
 from tests.ml_helpers import RaisingProvider
-from tests.pipeline_helpers import make_deps, run
+from tests.pipeline_helpers import NoRouter, StubRouter, make_deps, run
 from tests.property.test_llm_router import AWS_SECRET_KEY, FALLBACK_URL, PRIMARY_URL, aws_credentials, make_settings
 from tests.property.test_vector_store import CountingProvider, MemoryBackend
 from tests.vision_helpers import StubEngine, skewed_table_png
@@ -100,6 +102,36 @@ def test_image_session_with_skewed_table(monkeypatch, bedrock):
     assert math.isclose(abs(vision_payload["skew_angle_degrees"]), 3.0, abs_tol=1.0)
     assert node_events(events)[:2] == [("vision_extractor", "started"), ("vision_extractor", "completed")]
     assert events[-1].payload["status"] == "completed"
+
+
+def _unsure_ocr(monkeypatch):
+    unsure = {"paddleocr": lambda: StubEngine("paddleocr", [0.2]), "tesseract": lambda: StubEngine("tesseract", [0.2])}
+    monkeypatch.setattr(vision, "_default_factories", lambda: unsure)
+
+
+def test_low_confidence_ocr_is_kept_when_no_llm_is_configured(monkeypatch):
+    # The free deployment's faded dot-matrix preset takes this path whenever the vision LLM is absent or rate-limited.
+    _unsure_ocr(monkeypatch)
+    final, events = pipeline(data=skewed_table_png(0.0), kind="image", name="manifest.png", router=NoRouter())
+    vision_payload = completed(events, "vision_extractor")
+    assert len(vision_payload["cells"]) == 20 and all(c["confidence"] < 0.4 for c in vision_payload["cells"])
+    assert events[-1].payload["status"] == "completed"
+
+
+def test_low_confidence_ocr_is_kept_when_the_vision_llm_fails(monkeypatch):
+    _unsure_ocr(monkeypatch)
+    failing = StubRouter(lambda _req: (_ for _ in ()).throw(ProviderFailure([])))
+    final, events = pipeline(data=skewed_table_png(0.0), kind="image", name="manifest.png", router=failing)
+    assert len(completed(events, "vision_extractor")["cells"]) == 20
+    assert events[-1].payload["status"] == "completed"
+
+
+def test_image_without_a_table_still_fails_when_no_llm_is_configured():
+    blank = cv2.imencode(".png", np.full((600, 800), 255, np.uint8))[1].tobytes()
+    final, events = pipeline(data=blank, kind="image", name="blank.png", router=NoRouter())
+    errors = [e for e in events if e.type == "error"]
+    assert errors and errors[0].payload["code"] == "no_table_detected"
+    assert events[-1].payload["status"] == "failed"
 
 
 def test_failing_node_ends_with_error_then_terminal():
