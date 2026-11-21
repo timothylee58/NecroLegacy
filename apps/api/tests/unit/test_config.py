@@ -5,13 +5,27 @@ import pytest
 from app.core.config import ConfigError, load_settings
 
 
-@pytest.mark.parametrize("missing", ["WEB_ORIGIN", "REDIS_URL", "SUPABASE_DB_URL"])
-def test_missing_required_variable_is_named_without_values(env, missing):
+@pytest.mark.parametrize(
+    ("missing", "named"),
+    [("WEB_ORIGIN", "WEB_ORIGIN"), ("REDIS_URL", "REDIS_URL"), ("SUPABASE_DB_URL", "DATABASE_URL")],
+)
+def test_missing_required_variable_is_named_without_values(env, missing, named):
     env.delenv(missing)
     with pytest.raises(ConfigError) as exc:
         load_settings()
-    assert missing in str(exc.value)
+    assert named in str(exc.value)
     assert "localhost" not in str(exc.value)
+
+
+def test_database_url_is_the_preferred_name_for_postgres(env):
+    env.delenv("SUPABASE_DB_URL")
+    env.setenv("DATABASE_URL", "postgresql://neon@example/db")
+    assert load_settings().supabase_db_url.get_secret_value() == "postgresql://neon@example/db"
+
+
+def test_database_url_wins_over_the_legacy_name(env):
+    env.setenv("DATABASE_URL", "postgresql://new@example/db")
+    assert load_settings().supabase_db_url.get_secret_value() == "postgresql://new@example/db"
 
 
 def test_defaults(env):

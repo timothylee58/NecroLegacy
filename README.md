@@ -28,7 +28,7 @@ pnpm install
 cd apps/web && NEXT_PUBLIC_USE_MOCK=true pnpm dev
 
 # API (needs Redis and Postgres with pgvector; docker compose provides both)
-cp .env.example .env   # fill in WEB_ORIGIN, REDIS_URL, SUPABASE_DB_URL
+cp .env.example .env   # fill in WEB_ORIGIN, REDIS_URL, DATABASE_URL
 docker compose up --build
 
 # Web app against the API
@@ -66,7 +66,7 @@ The free deployment runs the web app as a Render static site (`render.yaml`) and
 |---|---|---|---|
 | `WEB_ORIGIN` | Browser origin allowed by CORS (single origin, no wildcard) | - | required |
 | `REDIS_URL` | Redis connection URL for the result cache | - | required |
-| `SUPABASE_DB_URL` | Postgres URL with pgvector for record search | - | required |
+| `DATABASE_URL` | Postgres with pgvector for record search. Use the **direct** (non-pooled) string, Neon's `DATABASE_URL_UNPOOLED`. `SUPABASE_DB_URL` is accepted as an alias | - | required |
 | `LLM_PROVIDER` | `bedrock` (default) or `openai_compatible`; the free deployment uses `openai_compatible` with Groq | - | optional |
 | `LLM_PRIMARY_MODEL` | Primary open-weight model id (default `openai.gpt-oss-120b-1:0`; `openai/gpt-oss-120b` on Groq) | - | optional |
 | `LLM_PRIMARY_VISION` | `true` if the primary model accepts images (default false) | - | optional |

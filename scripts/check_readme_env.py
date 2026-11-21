@@ -30,7 +30,9 @@ def settings_names() -> list[str]:
     sys.path.insert(0, str(ROOT / "apps/api"))
     from app.core.config import Settings
 
-    return [name.upper() for name in Settings.model_fields]
+    # A field documented under its preferred alias (DATABASE_URL) counts as documented.
+    preferred = {"supabase_db_url": "DATABASE_URL"}
+    return [preferred.get(name, name.upper()) for name in Settings.model_fields]
 
 
 def main() -> int:

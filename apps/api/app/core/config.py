@@ -1,12 +1,12 @@
 import logging
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import AliasChoices, Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("necro.config")
 
-REQUIRED_VARIABLES = ("WEB_ORIGIN", "REDIS_URL", "SUPABASE_DB_URL")
+REQUIRED_VARIABLES = ("WEB_ORIGIN", "REDIS_URL", "DATABASE_URL")
 
 
 class ConfigError(RuntimeError):
@@ -26,11 +26,15 @@ def _int_in_range(name: str, value: Any, low: int, high: int, default: int) -> i
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=None, extra="ignore", case_sensitive=False)
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", case_sensitive=False, populate_by_name=True)
 
     web_origin: str
     redis_url: SecretStr
-    supabase_db_url: SecretStr
+    # DATABASE_URL is the standard name (Neon's `neon env pull` writes it); SUPABASE_DB_URL still works.
+    # Use a direct connection string: startup runs session-level statements such as CREATE EXTENSION.
+    supabase_db_url: SecretStr = Field(
+        validation_alias=AliasChoices("DATABASE_URL", "SUPABASE_DB_URL", "supabase_db_url")
+    )
 
     # Bedrock credentials come from the standard AWS chain (env, profile, role), never from Settings.
     llm_provider: Literal["bedrock", "openai_compatible"] = "bedrock"
@@ -140,9 +144,14 @@ class Settings(BaseSettings):
         return v
 
 
+_DISPLAY = {"supabase_db_url": "DATABASE_URL", "DATABASE_URL": "DATABASE_URL"}
+
+
 def load_settings(**overrides: Any) -> Settings:
     try:
         return Settings(**overrides)
     except ValidationError as exc:
-        names = sorted({str(err["loc"][0]).upper() for err in exc.errors() if err["loc"]})
+        names = sorted(
+            {_DISPLAY.get(str(err["loc"][0]), str(err["loc"][0]).upper()) for err in exc.errors() if err["loc"]}
+        )
         raise ConfigError(f"Invalid or missing configuration: {', '.join(names)}") from None

@@ -30,8 +30,10 @@ account (a card) even when usage stays inside the free tier. The other services 
 
 ## 1. Data services and the LLM key
 
-1. **Neon**: create a project, then copy the **direct** connection string (not the `-pooler` one), ending in
-   `?sslmode=require`. The API enables the `vector` extension on first start.
+1. **Neon**: the repo is linked to project `necrolegacy` (`crimson-band-09568351`, AWS US East 2) through `neon.ts`
+   and the git-ignored `.neon` file. `neon login` then `neon deploy` writes `.env.local` with `DATABASE_URL` (pooled)
+   and `DATABASE_URL_UNPOOLED` (direct). The API needs the **direct** one: its startup runs `CREATE EXTENSION`, a
+   session-level statement, and it keeps its own small connection pool. The API enables `vector` on first start.
 2. **Upstash**: create a Redis database in a region near `us-central1` and copy its `rediss://` URL.
 3. **Groq**: create an API key. The fallback model, which reads scanned images when OCR is unsure, defaults to
    `qwen/qwen3.8-27b`, Groq's generally available vision model in November 2026. Its default thinking mode
@@ -61,13 +63,16 @@ gcloud artifacts repositories set-cleanup-policies necrolegacy --location="$REGI
 
 # Secrets. `read -rs` keeps each value out of the terminal and shell history; printf stores it without a
 # trailing newline (a newline at the end of a URL breaks the connection).
-read -rs "DB_URL?Neon direct connection string: " && echo
-printf '%s' "$DB_URL" | gcloud secrets create necro-db-url --data-file=-
+# The Neon string comes straight from .env.local (written by `neon deploy`), so it is never pasted or shown.
+sed -n 's/^DATABASE_URL_UNPOOLED=//p' .env.local | tr -d '"\n' | gcloud secrets create necro-db-url --data-file=-
 read -rs "REDIS_URL?Upstash rediss:// URL: " && echo
 printf '%s' "$REDIS_URL" | gcloud secrets create necro-redis-url --data-file=-
 read -rs "LLM_KEY?Groq API key: " && echo
 printf '%s' "$LLM_KEY" | gcloud secrets create necro-llm-key --data-file=-
 unset DB_URL REDIS_URL LLM_KEY
+# If a secret already exists (or a value was wrong), add a new version instead of creating it; deploys read
+# `latest`. For example, from the repo root:
+#   sed -n 's/^DATABASE_URL_UNPOOLED=//p' .env.local | tr -d '"\n' | gcloud secrets versions add necro-db-url --data-file=- --project "$PROJECT_ID"
 
 # Runtime identity: may only read those secrets.
 gcloud iam service-accounts create necro-api --display-name="NecroLegacy API runtime"

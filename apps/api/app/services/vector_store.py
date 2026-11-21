@@ -28,6 +28,7 @@ UPSERT_BATCH = 1_000
 SEARCH_LIMIT = 100
 SEARCH_MIN_SIMILARITY = 0.35
 SEARCH_TIMEOUT_SECONDS = 4.5
+POOL_CHECKOUT_SECONDS = 15.0
 STATEMENT_TIMEOUT_MS = 4_000
 PURGE_INTERVAL_SECONDS = 3_600
 QUERY_MAX_CHARS = 500
@@ -398,11 +399,13 @@ class PgBackend:
         if pool is None:
             from psycopg_pool import AsyncConnectionPool
 
+            # Managed Postgres such as Neon spends about 1.5 s on each TLS + SCRAM handshake, and longer when the
+            # compute wakes from scale-to-zero, so a short checkout wait failed before the first connection existed.
             pool = AsyncConnectionPool(
                 dsn,
                 min_size=1,
                 max_size=5,
-                timeout=3,
+                timeout=POOL_CHECKOUT_SECONDS,
                 open=False,
                 kwargs={"prepare_threshold": None},
                 configure=self._configure,
