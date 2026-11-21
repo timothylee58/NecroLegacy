@@ -355,3 +355,91 @@ def test_schema_mismatch_names_paths_and_types_but_not_values(caplog):
         asyncio.run(router.complete(LLMRequest(purpose="t", system="s", user="u", response_model=Answer)))
     assert "schema_mismatch[value:int_from_float]" in caplog.text
     assert BODY_CANARY not in caplog.text and "3.5" not in caplog.text
+
+
+GROQ_429_HEADERS = {
+    "retry-after": "2",
+    "x-ratelimit-limit-tokens": "8000",
+    "x-ratelimit-remaining-tokens": "0",
+    "x-ratelimit-reset-tokens": "7.66s",
+    "x-ratelimit-limit-requests": "1000",
+    "x-ratelimit-remaining-requests": "993",
+    "x-ratelimit-reset-requests": "10m4.8s",
+}
+OK_REPLY = {"choices": [{"message": {"content": '{"value": 1}'}}]}
+
+
+@pytest.fixture
+def slept(monkeypatch) -> list[float]:
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    monkeypatch.setattr("app.core.llm.asyncio.sleep", fake_sleep)
+    return waits
+
+
+@respx.mock
+def test_short_rate_limit_is_retried_once_on_the_same_model(slept, caplog):
+    route = respx.post(COMPAT_URL).mock(
+        side_effect=[
+            httpx.Response(429, headers=GROQ_429_HEADERS, text=BODY_CANARY),
+            httpx.Response(200, json=OK_REPLY),
+        ]
+    )
+    with caplog.at_level(logging.WARNING, logger="necro.llm"):
+        result = asyncio.run(_compat_router().complete(LLMRequest("t", "s", "u", Answer)))
+    assert result.provider == "primary" and route.call_count == 2 and slept == [2.0]
+    assert {json.loads(c.request.content)["model"] for c in route.calls} == {PRIMARY_MODEL}
+    assert "host=llm.test" in caplog.text
+    assert "remaining-tokens=0 reset-tokens=7.66s" in caplog.text and "retrying once" in caplog.text
+    assert BODY_CANARY not in caplog.text and API_KEY not in caplog.text
+
+
+@respx.mock
+def test_retry_happens_at_most_once_then_falls_back(slept):
+    def handler(req: httpx.Request) -> httpx.Response:
+        if json.loads(req.content)["model"] == PRIMARY_MODEL:
+            return httpx.Response(429, headers={"retry-after": "1"})
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"value": 2}'}}]})
+
+    route = respx.post(COMPAT_URL).mock(side_effect=handler)
+    result = asyncio.run(_compat_router().complete(LLMRequest("t", "s", "u", Answer)))
+    assert result.provider == "fallback" and route.call_count == 3 and slept == [1.0]
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(429, headers={"retry-after": "45"}),  # longer than the node budget allows
+        httpx.Response(429),  # no retry-after
+        httpx.Response(429, headers={"retry-after": "soon"}),
+        httpx.Response(500, headers={"retry-after": "1"}),  # not a retryable status
+    ],
+)
+def test_no_retry_without_a_short_valid_wait(slept, response):
+    route = respx.post(COMPAT_URL).mock(return_value=response)
+    with pytest.raises(ProviderFailure):
+        asyncio.run(_compat_router(llm_fallback_model="").complete(LLMRequest("t", "s", "u", Answer)))
+    assert route.call_count == 1 and slept == []
+
+
+@respx.mock
+def test_rate_limit_log_drops_header_values_that_are_not_counts(caplog):
+    respx.post(COMPAT_URL).mock(
+        return_value=httpx.Response(429, headers={"x-ratelimit-remaining-tokens": BODY_CANARY, "retry-after": "99"})
+    )
+    with caplog.at_level(logging.WARNING, logger="necro.llm"), pytest.raises(ProviderFailure):
+        asyncio.run(_compat_router(llm_fallback_model="").complete(LLMRequest("t", "s", "u", Answer)))
+    assert "retry-after=99" in caplog.text and BODY_CANARY not in caplog.text
+
+
+@respx.mock
+def test_request_reply_cap_is_sent():
+    route = respx.post(COMPAT_URL).mock(return_value=httpx.Response(200, json=OK_REPLY))
+    asyncio.run(_compat_router().complete(LLMRequest("t", "s", "u", Answer, max_tokens=1234)))
+    assert json.loads(route.calls[-1].request.content)["max_tokens"] == 1234
+    asyncio.run(_compat_router().complete(LLMRequest("t", "s", "u", Answer)))
+    assert json.loads(route.calls[-1].request.content)["max_tokens"] == 4096

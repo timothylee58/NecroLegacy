@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import logging
@@ -22,6 +23,21 @@ FallbackReason = Literal["error", "timeout", "validation"]
 
 PROVIDER_TIMEOUT_SECONDS = 30.0
 MAX_TOKENS = 4096
+# One retry after a 429/503 that names a short wait. Longer waits would push the call past its node's time budget
+# (the vision node allows 120 s for local OCR, one LLM attempt per role and this pause), so they fail through instead.
+MAX_RETRY_WAIT_SECONDS = 10.0
+RETRY_STATUSES = frozenset({429, 503})
+# Groq's documented rate-limit headers; only these are logged, and only when their values look like counts or durations.
+RATE_LIMIT_HEADERS = (
+    "retry-after",
+    "x-ratelimit-limit-tokens",
+    "x-ratelimit-remaining-tokens",
+    "x-ratelimit-reset-tokens",
+    "x-ratelimit-limit-requests",
+    "x-ratelimit-remaining-requests",
+    "x-ratelimit-reset-requests",
+)
+_HEADER_VALUE = re.compile(r"^[0-9][0-9.hms]{0,15}$")
 BEDROCK_SERVICE = "bedrock"
 
 _FENCE = re.compile(r"^\s*```[A-Za-z0-9_-]*\s*\n(.*?)\n?```\s*$", re.DOTALL)
@@ -38,6 +54,9 @@ class LLMRequest[T: BaseModel]:
     user: str
     response_model: type[T]
     images: list[bytes] = field(default_factory=list)
+    # Providers such as Groq reserve max_tokens against the per-minute token budget, so callers whose replies are
+    # known to be short should lower it.
+    max_tokens: int = MAX_TOKENS
 
 
 @dataclass
@@ -60,11 +79,12 @@ class ProviderFailure(RuntimeError):
 
 
 class _AttemptFailed(Exception):
-    def __init__(self, reason: str, detail: str = "") -> None:
+    def __init__(self, reason: str, detail: str = "", retry_after: float | None = None) -> None:
         super().__init__(reason)
         self.reason = reason
         # A code such as "http_429" or "finish_reason=length"; never response content or credentials.
         self.detail = detail
+        self.retry_after = retry_after
 
 
 @dataclass(frozen=True)
@@ -201,6 +221,23 @@ class LLMRouter:
             raise ProviderFailure(attempts) from None
 
     async def _call[T: BaseModel](self, target: _Target, req: LLMRequest[T]) -> T:
+        try:
+            return await self._call_once(target, req)
+        except _AttemptFailed as exc:
+            if exc.retry_after is None or exc.retry_after > MAX_RETRY_WAIT_SECONDS:
+                raise
+            logger.warning(
+                "llm %s retrying once: purpose=%s model=%s detail=%s wait=%.1fs",
+                target.role,
+                req.purpose,
+                target.model,
+                exc.detail,
+                exc.retry_after,
+            )
+            await asyncio.sleep(exc.retry_after)
+            return await self._call_once(target, req)
+
+    async def _call_once[T: BaseModel](self, target: _Target, req: LLMRequest[T]) -> T:
         if self._transport == "bedrock":
             return await self._call_bedrock(target, req)
         return await self._call_openai_compatible(target, req)
@@ -214,7 +251,11 @@ class LLMRouter:
         except httpx.HTTPError:
             raise _AttemptFailed("error") from None
         if response.status_code >= 400:
-            raise _AttemptFailed("error", f"http_{response.status_code}")
+            code = response.status_code
+            if code == 429:
+                _log_rate_limit(url, response.headers)
+            retry_after = _retry_after(response.headers) if code in RETRY_STATUSES else None
+            raise _AttemptFailed("error", f"http_{code}", retry_after)
         try:
             parsed = response.json()
         except ValueError:
@@ -247,7 +288,7 @@ class LLMRouter:
             {
                 "system": [{"text": f"{req.system}\n\n{_schema_hint(req.response_model)}"}],
                 "messages": [{"role": "user", "content": content}],
-                "inferenceConfig": {"maxTokens": MAX_TOKENS},
+                "inferenceConfig": {"maxTokens": req.max_tokens},
             }
         ).encode()
         url = self.bedrock_url(target.model)
@@ -272,7 +313,7 @@ class LLMRouter:
         content += [{"type": "image_url", "image_url": {"url": _data_uri(img)}} for img in req.images]
         payload: dict[str, Any] = {
             "model": target.model,
-            "max_tokens": MAX_TOKENS,
+            "max_tokens": req.max_tokens,
             "messages": [
                 {"role": "system", "content": f"{req.system}\n\n{_schema_hint(req.response_model)}"},
                 {"role": "user", "content": content},
@@ -312,6 +353,25 @@ def _error_codes(exc: ValidationError, limit: int = 3) -> str:
         parts.append(f"{loc}:{kind}")
     more = exc.error_count() - len(parts)
     return ",".join(parts) + (f",+{more}" if more > 0 else "")
+
+
+def _retry_after(headers: httpx.Headers) -> float | None:
+    # Seconds only; the HTTP-date form is not used by the providers we route to.
+    try:
+        wait = float(headers.get("retry-after", ""))
+    except ValueError:
+        return None
+    return wait if 0 <= wait < float("inf") else None
+
+
+def _log_rate_limit(url: str, headers: httpx.Headers) -> None:
+    host = httpx.URL(url).host
+    values = []
+    for name in RATE_LIMIT_HEADERS:
+        value = headers.get(name)
+        if value is not None and _HEADER_VALUE.match(value):
+            values.append(f"{name.removeprefix('x-ratelimit-')}={value}")
+    logger.warning("llm rate limited: host=%s %s", host, " ".join(values) or "no_rate_limit_headers")
 
 
 def _log_attempt(purpose: str, target: _Target, exc: _AttemptFailed) -> None:

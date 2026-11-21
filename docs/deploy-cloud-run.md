@@ -40,6 +40,10 @@ account (a card) even when usage stays inside the free tier. The other services 
    `reasoning_effort: "none"` (Qwen's instruct mode): in its default thinking mode the reasoning ran past the
    30-second provider timeout or the 4,096-token reply limit, so scans fell back to local OCR. If Groq retires the
    model, set `LLM_FALLBACK_MODEL` and check whether the new one accepts `none` (`LLM_FALLBACK_REASONING_EFFORT`).
+   On the free tier the vision model allows 8,000 tokens a minute, and Groq counts the reply cap against it, so
+   image calls cap replies at 2,560 tokens and ask for minified JSON. A 429 with `retry-after` of 10 s or less is
+   retried once on the same model; every 429 logs Groq's `x-ratelimit-*` counters as
+   `llm rate limited: host=… remaining-tokens=… reset-tokens=…`.
 
 ## 2. Google Cloud (one time)
 
