@@ -27,6 +27,16 @@ def _bearer_ok(header: str, token: str) -> bool:
     return scheme.lower() == "bearer" and hmac.compare_digest(value.encode(), token.encode())
 
 
+def _build_cache(settings: Settings) -> ResultCache | None:
+    try:
+        return ResultCache.from_url(settings.redis_url.get_secret_value(), settings.cache_ttl_seconds)
+    except ValueError:
+        # A malformed URL must not stop the API: results are still computed, only replay is lost (15.6).
+        # The value is never logged; it is a credential.
+        logger.error("REDIS_URL is not a redis://, rediss:// or unix:// URL; result caching is disabled")
+        return None
+
+
 async def _build_context(settings: Settings) -> AppContext:
     backend = PgBackend(settings.supabase_db_url.get_secret_value())
     store = VectorStore(backend)
@@ -42,7 +52,7 @@ async def _build_context(settings: Settings) -> AppContext:
         router=LLMRouter(settings),
         pool=WorkerPool(),
         embedding_provider=get_provider(settings),
-        cache=ResultCache.from_url(settings.redis_url.get_secret_value(), settings.cache_ttl_seconds),
+        cache=_build_cache(settings),
         vector_store=store,
     )
 

@@ -86,3 +86,19 @@ def test_invalid_llm_provider_warns_and_defaults(env, caplog):
 def test_blank_model_disables_that_model(env):
     env.setenv("LLM_PRIMARY_MODEL", "  ")
     assert load_settings().llm_primary_model is None
+
+
+def test_malformed_redis_url_disables_the_cache_without_logging_it(env, caplog):
+    from app.main import _build_cache
+
+    env.setenv("REDIS_URL", "https://secret-host.upstash.io")
+    with caplog.at_level(logging.ERROR):
+        assert _build_cache(load_settings()) is None
+    assert "result caching is disabled" in caplog.text and "secret-host" not in caplog.text
+
+
+def test_valid_redis_url_builds_a_cache(env):
+    from app.main import _build_cache
+
+    env.setenv("REDIS_URL", "rediss://default:token@example.upstash.io:6379")
+    assert _build_cache(load_settings()) is not None
