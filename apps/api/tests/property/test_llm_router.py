@@ -4,6 +4,7 @@ import json
 import logging
 
 import httpx
+import pytest
 import respx
 from botocore.credentials import Credentials
 from hypothesis import given, settings
@@ -289,3 +290,57 @@ def test_openai_compatible_reasoning_reply_is_accepted():
     request = LLMRequest(purpose="t", system="s", user="u", response_model=Answer)
     result = asyncio.run(router.complete(request))
     assert result.data.value == 7 and result.provider == "primary"
+
+
+def _compat_router(**overrides) -> LLMRouter:
+    return LLMRouter(make_settings(provider="openai_compatible").model_copy(update=overrides))
+
+
+@respx.mock
+def test_reasoning_effort_is_sent_per_model_only_when_set():
+    route = respx.post(COMPAT_URL).mock(
+        return_value=httpx.Response(200, json={"choices": [{"message": {"content": '{"value": 1}'}}]})
+    )
+    request = LLMRequest(purpose="t", system="s", user="u", response_model=Answer)
+    asyncio.run(_compat_router().complete(request))
+    assert "reasoning_effort" not in json.loads(route.calls[-1].request.content)
+    asyncio.run(_compat_router(llm_primary_reasoning_effort="low").complete(request))
+    assert json.loads(route.calls[-1].request.content)["reasoning_effort"] == "low"
+
+
+@respx.mock
+def test_fallback_effort_reaches_only_the_fallback(caplog):
+    bodies: list[dict] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content)
+        bodies.append(body)
+        if body["model"] == PRIMARY_MODEL:
+            return httpx.Response(429, text=BODY_CANARY)
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"value": 2}'}}]})
+
+    respx.post(COMPAT_URL).mock(side_effect=handler)
+    router = _compat_router(llm_fallback_reasoning_effort="none")
+    with caplog.at_level(logging.WARNING, logger="necro.llm"):
+        result = asyncio.run(router.complete(LLMRequest(purpose="t", system="s", user="u", response_model=Answer)))
+    assert result.provider == "fallback"
+    assert "reasoning_effort" not in bodies[0] and bodies[1]["reasoning_effort"] == "none"
+    assert "llm primary attempt failed: purpose=t" in caplog.text and "detail=http_429" in caplog.text
+    assert BODY_CANARY not in caplog.text and API_KEY not in caplog.text
+
+
+@respx.mock
+def test_truncated_reply_is_logged_as_length(caplog):
+    cut = {"choices": [{"message": {"content": '{"val'}, "finish_reason": "length"}]}
+    respx.post(COMPAT_URL).mock(return_value=httpx.Response(200, json=cut))
+    router = _compat_router(llm_fallback_model="")
+    with caplog.at_level(logging.WARNING, logger="necro.llm"), pytest.raises(ProviderFailure):
+        asyncio.run(router.complete(LLMRequest(purpose="t", system="s", user="u", response_model=Answer)))
+    assert "reason=validation detail=finish_reason=length" in caplog.text
+
+
+def test_invalid_reasoning_effort_is_rejected():
+    with pytest.raises(ValueError):
+        make_settings().model_copy(update={}).model_validate(
+            {**make_settings().model_dump(), "llm_fallback_reasoning_effort": "max"}
+        )

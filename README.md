@@ -71,6 +71,8 @@ The free deployment runs the web app as a Render static site (`render.yaml`) and
 | `LLM_PRIMARY_MODEL` | Primary open-weight model id (default `openai.gpt-oss-120b-1:0`; `openai/gpt-oss-120b` on Groq) | - | optional |
 | `LLM_PRIMARY_VISION` | `true` if the primary model accepts images (default false) | - | optional |
 | `LLM_FALLBACK_MODEL` | Fallback model id, Claude on Bedrock by default; a vision model on Groq | - | optional |
+| `LLM_PRIMARY_REASONING_EFFORT` | `none`, `low`, `medium` or `high`, sent as `reasoning_effort` to the primary on `openai_compatible` only when set. gpt-oss accepts only low/medium/high | - | optional |
+| `LLM_FALLBACK_REASONING_EFFORT` | Same for the fallback. The free deployment sets `none`, Qwen's instruct mode, so scanned images get a direct JSON answer | - | optional |
 | `LLM_FALLBACK_VISION` | `true` if the fallback model accepts images (default true) | - | optional |
 | `AWS_REGION` | Bedrock region | - | optional |
 | `AWS_ACCESS_KEY_ID` | Bedrock credential; leave unset when using an IAM role | - | optional |

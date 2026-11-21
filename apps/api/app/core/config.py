@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     llm_primary_vision: bool = False
     llm_fallback_model: str | None = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
     llm_fallback_vision: bool = True
+    # Sent as `reasoning_effort` on OpenAI-compatible calls only when set. Per model, because values differ:
+    # Qwen on Groq accepts "none" (instruct mode), gpt-oss only low/medium/high.
+    llm_primary_reasoning_effort: Literal["none", "low", "medium", "high"] | None = None
+    llm_fallback_reasoning_effort: Literal["none", "low", "medium", "high"] | None = None
     llm_base_url: str | None = None
     llm_api_key: SecretStr | None = None
 
@@ -68,7 +72,15 @@ class Settings(BaseSettings):
     def _blank_secret_is_unset(cls, v: Any) -> Any:
         return None if isinstance(v, str) and not v.strip() else v
 
-    @field_validator("aws_region", "llm_primary_model", "llm_fallback_model", "llm_base_url", mode="before")
+    @field_validator(
+        "aws_region",
+        "llm_primary_model",
+        "llm_fallback_model",
+        "llm_base_url",
+        "llm_primary_reasoning_effort",
+        "llm_fallback_reasoning_effort",
+        mode="before",
+    )
     @classmethod
     def _blank_is_unset(cls, v: Any) -> Any:
         return None if isinstance(v, str) and not v.strip() else v

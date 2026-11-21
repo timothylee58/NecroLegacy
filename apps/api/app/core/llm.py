@@ -60,9 +60,11 @@ class ProviderFailure(RuntimeError):
 
 
 class _AttemptFailed(Exception):
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, detail: str = "") -> None:
         super().__init__(reason)
         self.reason = reason
+        # A code such as "http_429" or "finish_reason=length"; never response content or credentials.
+        self.detail = detail
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,7 @@ class _Target:
     role: ProviderName
     model: str
     vision: bool
+    reasoning_effort: str | None = None
 
 
 # Reasoning models served over OpenAI-compatible APIs (Qwen on Groq in its default mode) can prepend their thinking
@@ -117,8 +120,18 @@ class LLMRouter:
         self._transport = settings.llm_provider
         self._client = client or httpx.AsyncClient()
         self._targets = [
-            _Target("primary", settings.llm_primary_model or "", settings.llm_primary_vision),
-            _Target("fallback", settings.llm_fallback_model or "", settings.llm_fallback_vision),
+            _Target(
+                "primary",
+                settings.llm_primary_model or "",
+                settings.llm_primary_vision,
+                settings.llm_primary_reasoning_effort,
+            ),
+            _Target(
+                "fallback",
+                settings.llm_fallback_model or "",
+                settings.llm_fallback_vision,
+                settings.llm_fallback_reasoning_effort,
+            ),
         ]
         self._region = settings.aws_region or ""
         self._base_url = (settings.llm_base_url or "").rstrip("/")
@@ -169,6 +182,7 @@ class LLMRouter:
             try:
                 return LLMResult(await self._call(primary, req), "primary")
             except _AttemptFailed as exc:
+                _log_attempt(req.purpose, primary, exc)
                 attempts.append(ProviderAttempt("primary", exc.reason))
                 if fallback_ready and events is not None:
                     await events.emit_fallback("primary", _fallback_reason(exc.reason))
@@ -182,6 +196,7 @@ class LLMRouter:
         try:
             return LLMResult(await self._call(fallback, req), "fallback")
         except _AttemptFailed as exc:
+            _log_attempt(req.purpose, fallback, exc)
             attempts.append(ProviderAttempt("fallback", exc.reason))
             raise ProviderFailure(attempts) from None
 
@@ -199,23 +214,23 @@ class LLMRouter:
         except httpx.HTTPError:
             raise _AttemptFailed("error") from None
         if response.status_code >= 400:
-            raise _AttemptFailed("error")
+            raise _AttemptFailed("error", f"http_{response.status_code}")
         try:
             parsed = response.json()
         except ValueError:
-            raise _AttemptFailed("validation") from None
+            raise _AttemptFailed("validation", "body_not_json") from None
         if not isinstance(parsed, dict):
-            raise _AttemptFailed("validation")
+            raise _AttemptFailed("validation", "body_not_object")
         return parsed
 
     @staticmethod
     def _parse[T: BaseModel](text: Any, model: type[T]) -> T:
         if not isinstance(text, str):
-            raise _AttemptFailed("validation")
+            raise _AttemptFailed("validation", "no_text")
         try:
             return model.model_validate_json(strip_fences(text))
         except ValidationError:
-            raise _AttemptFailed("validation") from None
+            raise _AttemptFailed("validation", "schema_mismatch") from None
 
     def bedrock_url(self, model: str) -> str:
         # Model ids contain ':' and inference-profile prefixes; SigV4 signs the encoded path, as boto3 does.
@@ -248,34 +263,50 @@ class LLMRouter:
             # Reasoning models emit reasoningContent blocks before the answer; take the first text block.
             text = next(b["text"] for b in blocks if isinstance(b, dict) and "text" in b)
         except (KeyError, TypeError, StopIteration):
-            raise _AttemptFailed("validation") from None
+            raise _AttemptFailed("validation", "no_text") from None
         return self._parse(text, req.response_model)
 
     async def _call_openai_compatible[T: BaseModel](self, target: _Target, req: LLMRequest[T]) -> T:
         assert self._api_key is not None
         content: list[dict[str, Any]] = [{"type": "text", "text": req.user}]
         content += [{"type": "image_url", "image_url": {"url": _data_uri(img)}} for img in req.images]
-        body = json.dumps(
-            {
-                "model": target.model,
-                "max_tokens": MAX_TOKENS,
-                "messages": [
-                    {"role": "system", "content": f"{req.system}\n\n{_schema_hint(req.response_model)}"},
-                    {"role": "user", "content": content},
-                ],
-            }
-        ).encode()
+        payload: dict[str, Any] = {
+            "model": target.model,
+            "max_tokens": MAX_TOKENS,
+            "messages": [
+                {"role": "system", "content": f"{req.system}\n\n{_schema_hint(req.response_model)}"},
+                {"role": "user", "content": content},
+            ],
+        }
+        if target.reasoning_effort is not None:
+            payload["reasoning_effort"] = target.reasoning_effort
         headers = {**_bearer(self._api_key), "Content-Type": "application/json"}
-        data = await self._post(f"{self._base_url}/chat/completions", headers, body)
+        data = await self._post(f"{self._base_url}/chat/completions", headers, json.dumps(payload).encode())
         try:
-            text = data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            text = choice["message"]["content"]
         except (KeyError, IndexError, TypeError):
-            raise _AttemptFailed("validation") from None
+            raise _AttemptFailed("validation", "no_choice") from None
+        if isinstance(choice, dict) and choice.get("finish_reason") == "length":
+            # The reply hit max_tokens; a cut-off JSON object cannot validate, so say why instead of "invalid".
+            raise _AttemptFailed("validation", "finish_reason=length")
         return self._parse(text, req.response_model)
 
 
 def _bearer(key: SecretStr) -> dict[str, str]:
     return {"Authorization": f"Bearer {key.get_secret_value()}"}
+
+
+def _log_attempt(purpose: str, target: _Target, exc: _AttemptFailed) -> None:
+    # Codes only: purpose and model are fixed identifiers; reason and detail never carry content or secrets.
+    logger.warning(
+        "llm %s attempt failed: purpose=%s model=%s reason=%s%s",
+        target.role,
+        purpose,
+        target.model,
+        exc.reason,
+        f" detail={exc.detail}" if exc.detail else "",
+    )
 
 
 def _fallback_reason(reason: str) -> FallbackReason:

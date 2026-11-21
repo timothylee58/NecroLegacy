@@ -36,8 +36,10 @@ account (a card) even when usage stays inside the free tier. The other services 
    session-level statement, and it keeps its own small connection pool. The API enables `vector` on first start.
 2. **Upstash**: create a Redis database in a region near `us-central1` and copy its `rediss://` URL.
 3. **Groq**: create an API key. The fallback model, which reads scanned images when OCR is unsure, defaults to
-   `qwen/qwen3.8-27b`, Groq's generally available vision model in November 2026. Its default thinking mode
-   prepends `<think>` text, which the API strips before parsing. If Groq retires it, set `LLM_FALLBACK_MODEL`.
+   `qwen/qwen3.8-27b`, Groq's generally available vision model in November 2026. `deploy-api` sends it
+   `reasoning_effort: "none"` (Qwen's instruct mode): in its default thinking mode the reasoning ran past the
+   30-second provider timeout or the 4,096-token reply limit, so scans fell back to local OCR. If Groq retires the
+   model, set `LLM_FALLBACK_MODEL` and check whether the new one accepts `none` (`LLM_FALLBACK_REASONING_EFFORT`).
 
 ## 2. Google Cloud (one time)
 
