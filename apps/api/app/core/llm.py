@@ -38,6 +38,10 @@ RATE_LIMIT_HEADERS = (
     "x-ratelimit-reset-requests",
 )
 _HEADER_VALUE = re.compile(r"^[0-9][0-9.hms]{0,15}$")
+_ERROR_CODE = re.compile(r"^[a-z_]{1,40}$")
+_LIMIT_KIND = re.compile(r"\((TPM|TPD|RPM|RPD|ITPM|OTPM|ASH|ASD)\)")
+_LIMIT_NUMBER = re.compile(r"\b(Limit|Used|Requested) ([0-9]{1,12})\b")
+_TRY_AGAIN = re.compile(r"try again in ([0-9][0-9.hms]{0,15})")
 BEDROCK_SERVICE = "bedrock"
 
 _FENCE = re.compile(r"^\s*```[A-Za-z0-9_-]*\s*\n(.*?)\n?```\s*$", re.DOTALL)
@@ -252,8 +256,8 @@ class LLMRouter:
             raise _AttemptFailed("error") from None
         if response.status_code >= 400:
             code = response.status_code
-            if code == 429:
-                _log_rate_limit(url, response.headers)
+            if code in (413, 429):
+                _log_rate_limit(url, response)
             retry_after = _retry_after(response.headers) if code in RETRY_STATUSES else None
             raise _AttemptFailed("error", f"http_{code}", retry_after)
         try:
@@ -364,14 +368,48 @@ def _retry_after(headers: httpx.Headers) -> float | None:
     return wait if 0 <= wait < float("inf") else None
 
 
-def _log_rate_limit(url: str, headers: httpx.Headers) -> None:
+def _limit_facts(response: httpx.Response) -> list[str]:
+    """Which limit was hit, from the error body, as fixed codes and numbers only.
+
+    The headers cover only requests a day and tokens a minute, so a 429 caused by the daily token limit (or a
+    request too large for the per-minute budget) looks like a full budget there. Groq's message names the limit,
+    but it also carries the organization id, so nothing is copied from it except these matched fragments.
+    """
+    try:
+        error = response.json().get("error") or {}
+    except (ValueError, AttributeError):
+        return []
+    if not isinstance(error, dict):
+        return []
+    facts = []
+    code = error.get("code")
+    if isinstance(code, str) and _ERROR_CODE.match(code):
+        facts.append(f"code={code}")
+    message = error.get("message")
+    if isinstance(message, str):
+        message = message[:2000]
+        if kind := _LIMIT_KIND.search(message):
+            facts.append(f"limit={kind.group(1)}")
+        facts += [f"{m.group(1).lower()}={m.group(2)}" for m in _LIMIT_NUMBER.finditer(message)]
+        if wait := _TRY_AGAIN.search(message):
+            facts.append(f"try_again={wait.group(1)}")
+    return facts
+
+
+def _log_rate_limit(url: str, response: httpx.Response) -> None:
     host = httpx.URL(url).host
     values = []
     for name in RATE_LIMIT_HEADERS:
-        value = headers.get(name)
+        value = response.headers.get(name)
         if value is not None and _HEADER_VALUE.match(value):
             values.append(f"{name.removeprefix('x-ratelimit-')}={value}")
-    logger.warning("llm rate limited: host=%s %s", host, " ".join(values) or "no_rate_limit_headers")
+    values += _limit_facts(response)
+    logger.warning(
+        "llm rate limited: host=%s status=%d %s",
+        host,
+        response.status_code,
+        " ".join(values) or "no_rate_limit_detail",
+    )
 
 
 def _log_attempt(purpose: str, target: _Target, exc: _AttemptFailed) -> None:

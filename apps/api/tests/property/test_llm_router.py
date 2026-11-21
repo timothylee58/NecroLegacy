@@ -443,3 +443,38 @@ def test_request_reply_cap_is_sent():
     assert json.loads(route.calls[-1].request.content)["max_tokens"] == 1234
     asyncio.run(_compat_router().complete(LLMRequest("t", "s", "u", Answer)))
     assert json.loads(route.calls[-1].request.content)["max_tokens"] == 4096
+
+
+@respx.mock
+def test_rate_limit_log_names_the_limit_from_the_body_without_the_org(caplog):
+    org = "org_01canary000000000000000"
+    body = {
+        "error": {
+            "message": (
+                f"Rate limit reached for model `qwen/qwen3.8-27b` in organization `{org}` service tier `on_demand` "
+                "on tokens per day (TPD): Limit 200000, Used 198311, Requested 4720. Please try again in 21m2.4s. "
+                f"Need more tokens? {BODY_CANARY}"
+            ),
+            "type": "tokens",
+            "code": "rate_limit_exceeded",
+        }
+    }
+    respx.post(COMPAT_URL).mock(
+        return_value=httpx.Response(429, json=body, headers={"x-ratelimit-remaining-tokens": "8000"})
+    )
+    with caplog.at_level(logging.WARNING, logger="necro.llm"), pytest.raises(ProviderFailure):
+        asyncio.run(_compat_router(llm_fallback_model="").complete(LLMRequest("t", "s", "u", Answer)))
+    assert (
+        "status=429 remaining-tokens=8000 code=rate_limit_exceeded limit=TPD limit=200000 used=198311 "
+        "requested=4720 try_again=21m2.4s"
+    ) in caplog.text
+    # The router's own models are gpt-oss and Claude here, so "qwen" could only have come from the message.
+    assert org not in caplog.text and BODY_CANARY not in caplog.text and "qwen" not in caplog.text
+
+
+@respx.mock
+def test_rate_limit_log_survives_a_non_json_body(caplog):
+    respx.post(COMPAT_URL).mock(return_value=httpx.Response(429, text=BODY_CANARY))
+    with caplog.at_level(logging.WARNING, logger="necro.llm"), pytest.raises(ProviderFailure):
+        asyncio.run(_compat_router(llm_fallback_model="").complete(LLMRequest("t", "s", "u", Answer)))
+    assert "status=429 no_rate_limit_detail" in caplog.text and BODY_CANARY not in caplog.text
