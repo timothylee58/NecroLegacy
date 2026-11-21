@@ -58,10 +58,15 @@ cat > /tmp/cleanup.json <<'EOF'
 EOF
 gcloud artifacts repositories set-cleanup-policies necrolegacy --location="$REGION" --policy=/tmp/cleanup.json
 
-# Secrets. Paste each value when prompted, then press Ctrl-D.
-gcloud secrets create necro-db-url --data-file=-      # Neon direct connection string
-gcloud secrets create necro-redis-url --data-file=-   # Upstash rediss:// URL
-gcloud secrets create necro-llm-key --data-file=-     # Groq API key
+# Secrets. `read -rs` keeps each value out of the terminal and shell history; printf stores it without a
+# trailing newline (a newline at the end of a URL breaks the connection).
+read -rs "DB_URL?Neon direct connection string: " && echo
+printf '%s' "$DB_URL" | gcloud secrets create necro-db-url --data-file=-
+read -rs "REDIS_URL?Upstash rediss:// URL: " && echo
+printf '%s' "$REDIS_URL" | gcloud secrets create necro-redis-url --data-file=-
+read -rs "LLM_KEY?Groq API key: " && echo
+printf '%s' "$LLM_KEY" | gcloud secrets create necro-llm-key --data-file=-
+unset DB_URL REDIS_URL LLM_KEY
 
 # Runtime identity: may only read those secrets.
 gcloud iam service-accounts create necro-api --display-name="NecroLegacy API runtime"
