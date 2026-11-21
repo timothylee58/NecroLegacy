@@ -269,3 +269,23 @@ def test_bedrock_without_region_is_not_configured():
         router = LLMRouter(make_settings(region=None), aws_credentials=aws_credentials())
     assert not router.has_provider()
     assert any("AWS_REGION" in line for line in captured)
+
+
+def test_strip_fences_removes_a_leading_reasoning_block():
+    from app.core.llm import strip_fences
+
+    assert strip_fences('<think>\nrows look like a ledger\n</think>\n{"value": 3}') == '{"value": 3}'
+    assert strip_fences('<think>plan</think>\n```json\n{"value": 4}\n```') == '{"value": 4}'
+    # A tag inside a JSON value is data, not reasoning.
+    assert strip_fences('{"note": "<think>x</think>"}') == '{"note": "<think>x</think>"}'
+
+
+@respx.mock
+def test_openai_compatible_reasoning_reply_is_accepted():
+    # Qwen on Groq in its default thinking mode prepends <think>...</think> to the JSON answer.
+    reply = '<think>\nThe table has one row.\n</think>\n{"value": 7}'
+    respx.post(COMPAT_URL).mock(return_value=httpx.Response(200, json={"choices": [{"message": {"content": reply}}]}))
+    router = LLMRouter(make_settings(provider="openai_compatible"))
+    request = LLMRequest(purpose="t", system="s", user="u", response_model=Answer)
+    result = asyncio.run(router.complete(request))
+    assert result.data.value == 7 and result.provider == "primary"

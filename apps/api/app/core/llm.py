@@ -72,7 +72,13 @@ class _Target:
     vision: bool
 
 
+# Reasoning models served over OpenAI-compatible APIs (Qwen on Groq in its default mode) can prepend their thinking
+# to the answer. Only a leading block is removed, so a reasoning tag inside a JSON string value is left alone.
+_THINK = re.compile(r"\A\s*<(think|thinking|reasoning)>.*?</\1>", re.DOTALL | re.IGNORECASE)
+
+
 def strip_fences(text: str) -> str:
+    text = _THINK.sub("", text, count=1)
     match = _FENCE.match(text)
     return match.group(1) if match else text.strip()
 

@@ -33,8 +33,9 @@ account (a card) even when usage stays inside the free tier. The other services 
 1. **Neon**: create a project, then copy the **direct** connection string (not the `-pooler` one), ending in
    `?sslmode=require`. The API enables the `vector` extension on first start.
 2. **Upstash**: create a Redis database in a region near `us-central1` and copy its `rediss://` URL.
-3. **Groq**: create an API key. In the Groq console's model list, pick a current **vision** model for the fallback
-   (the fallback is the model that reads scanned images when OCR fails).
+3. **Groq**: create an API key. The fallback model, which reads scanned images when OCR is unsure, defaults to
+   `qwen/qwen3.8-27b`, Groq's generally available vision model in November 2026. Its default thinking mode
+   prepends `<think>` text, which the API strips before parsing. If Groq retires it, set `LLM_FALLBACK_MODEL`.
 
 ## 2. Google Cloud (one time)
 
@@ -105,12 +106,11 @@ gh variable set GCP_REGION --body "$REGION"
 gh variable set GCP_WIF_PROVIDER --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github"
 gh variable set GCP_DEPLOY_SA --body "$DEPLOY_SA"
 gh variable set GCP_RUNTIME_SA --body "$RUNTIME_SA"
-gh variable set LLM_FALLBACK_MODEL --body "<vision model id from the Groq console>"
 gh variable set WEB_ORIGIN --body "https://necrolegacy-web.onrender.com"   # the Render URL from step 5
 ```
 
-Optional overrides: `LLM_BASE_URL` (default `https://api.groq.com/openai/v1`) and `LLM_PRIMARY_MODEL` (default
-`openai/gpt-oss-120b`). None of these are secrets; secrets stay in Secret Manager.
+Optional overrides: `LLM_BASE_URL` (default `https://api.groq.com/openai/v1`), `LLM_PRIMARY_MODEL` (default
+`openai/gpt-oss-120b`) and `LLM_FALLBACK_MODEL` (default `qwen/qwen3.8-27b`). None of these are secrets; secrets stay in Secret Manager.
 
 ## 4. Deploy the API
 
