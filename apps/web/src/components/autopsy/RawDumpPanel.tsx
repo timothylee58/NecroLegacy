@@ -33,14 +33,9 @@ export function RawDumpPanel({ preview }: { preview: RawPreview | null | undefin
 
   return (
     <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 id={headingId} className="font-display text-3xl uppercase leading-none tracking-notice">
-          Raw dump
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          What the parser read before any inference, over the whole file.
-        </p>
-      </div>
+      <h2 id={headingId} className="font-display text-3xl uppercase leading-none tracking-notice">
+        Raw dump
+      </h2>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-y border-border py-3 text-sm sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
         <div className="min-w-0">
@@ -141,10 +136,6 @@ export function RawDumpPanel({ preview }: { preview: RawPreview | null | undefin
           </table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground tabular">
-        Showing the first {preview.records.length} records. Each record type is parsed again on its own before
-        schema inference.
-      </p>
     </section>
   );
 }

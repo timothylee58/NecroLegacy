@@ -74,7 +74,7 @@ components:
 # Design System: NecroLegacy Autopsy Theatre
 
 ## Overview
-An anatomical theatre after hours. The case is posted as a coroner's notice in cream condensed poster type; the specimens lie on a 3D table lit by one overhead lamp. It is a working screen first (Operate mode): standard controls, a left case-file column, a main column for the verdict and the table, and search and code below. Atmosphere comes only from type, palette, density and the notice.
+An anatomical theatre after hours. The case is posted as a coroner's notice in cream condensed poster type; the specimens lie on a 3D table lit by one overhead lamp. It is a working screen first (Operate mode): standard controls, a left case-file column, a main column for the verdict and the table, and search and code below. Atmosphere comes from type, palette, the notice, and a few hand-drawn line illustrations (lamp, cobwebs, slab, bats, coffin, toe tag, candle) in bone and tallow.
 
 ## Colors
 ### Primary
@@ -103,7 +103,7 @@ An anatomical theatre after hours. The case is posted as a coroner's notice in c
 `max-w-[96rem]`, 2rem page gutters. Desktop: a 17.5rem case-file column (Procedure, Specimens, summary) beside the main column (notice above, table below, X-Ray beside the table for images). Search and code sit below a full-width rule in a 5:7 split. Mobile stacks notice, case file, table, then search and code. Lists are ruled rows, not cards.
 
 ## Elevation & Depth
-Flat panels separated by 1px rules. Only overlays lift: dialog and drawer use a long soft shadow (`0 24px 60px -12px rgb(0 0 0 / 0.7)`) over a dark scrim. The lamp pool (`.lamp-pool`) is the one lighting effect.
+Flat panels separated by 1px rules. Only overlays lift: dialog and drawer use a long soft shadow (`0 24px 60px -12px rgb(0 0 0 / 0.7)`) over a dark scrim. The lamp pool (`.lamp-pool`, `.lamp-glow`) is the one lighting effect; low fog (`.fog`) settles along the table floor.
 
 ## Shapes
 2px corners everywhere. Round shapes are reserved for severity dots and 3D nodes.
@@ -116,9 +116,15 @@ Slab fill, rule border, tallow caret and focus ring, crimson border when invalid
 ### Lists
 Specimens, presets, anomalies, flagged regions and search hits are ruled rows with a trailing chevron or badge.
 ### Motion
-One authored moment: the notice re-sets (rise, unblur) when the verdict changes. The drawer slides in 250ms. The running step's loader spins. All of it stops under `prefers-reduced-motion`.
+Authored moments: the notice re-sets (rise, unblur) when the verdict changes; three bats burst once off a critical verdict; a ghost rises beside the generated wrapper when its syntax check passes; two bats cross the empty slab once. Ambient: the lamp flickers rarely (never more than 3 dips a second), fog drifts, the running step's candle flickers. The drawer slides in 250ms. One-off moments are finite; ambient loops stay faint.
+
+Under `prefers-reduced-motion` all animation stops and the bats are hidden with `motion-reduce:hidden`. Gate motion with CSS, not `useReducedMotion()` branches in server-rendered markup; those cause hydration mismatches in the static export.
+
+### Illustrations
+`components/autopsy/illustrations.tsx` holds the line art; Lucide covers icon scale (`Skull` for critical, `Tombstone` for no search hits, `Ghost`, preset icons). Every illustration is `aria-hidden`; meaning always lives in the nearby text. Copy is kept short: the drawing carries the mood, a word carries the meaning.
 
 ## Do's and Don'ts
 - Do keep every control a standard web control; the theatre lends type and light, not costume.
 - Don't add cards, gradients on text, glow halos, or a second accent colour.
+- Don't use cartoon pumpkins or clip-art ghosts; Halloween stays in the theatre's line-drawn, bone-and-tallow register.
 - Don't use crimson for emphasis that is not a critical finding.

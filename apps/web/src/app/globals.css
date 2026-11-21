@@ -90,6 +90,108 @@
   }
 }
 
+@layer components {
+  /* The theatre's one light. An old lamp: steady, with rare irregular dips (never more than 3 a second). */
+  .lamp-glow {
+    background: radial-gradient(ellipse 45% 55% at 50% 0%, hsl(var(--tallow) / 0.16), transparent 70%);
+    animation: lamp-flicker 9s linear infinite;
+  }
+  .lamp-bulb {
+    animation: lamp-flicker 9s linear infinite;
+  }
+
+  /* Seamless fog: each layer is two tiles wide and slides exactly one tile, so the loop never jumps. */
+  .fog {
+    height: 38%;
+    overflow: hidden;
+    mask-image: linear-gradient(to top, black 35%, transparent);
+  }
+  .fog::before,
+  .fog::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 200%;
+    background-image:
+      radial-gradient(ellipse 22% 42% at 18% 82%, hsl(var(--foreground) / 0.07), transparent 70%),
+      radial-gradient(ellipse 28% 48% at 56% 92%, hsl(var(--foreground) / 0.06), transparent 70%),
+      radial-gradient(ellipse 18% 36% at 86% 80%, hsl(var(--foreground) / 0.07), transparent 70%);
+    background-size: 50% 100%;
+    background-repeat: repeat-x;
+    animation: fog-drift 46s linear infinite;
+  }
+  .fog::after {
+    top: 22%;
+    opacity: 0.8;
+    animation-duration: 71s;
+    animation-direction: reverse;
+  }
+
+  .bat-flap {
+    transform-origin: 50% 60%;
+    animation: bat-flap 0.17s ease-in-out 40 alternate;
+  }
+  /* Crosses a container that sets `container-type: inline-size`. */
+  .bat-cross {
+    left: 0;
+    animation: bat-cross 6.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) both;
+  }
+  .bat-burst {
+    animation: bat-burst 1.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .ghost-rise {
+    animation:
+      ghost-rise 1.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+      ghost-bob 3.2s ease-in-out 1.4s 4 alternate;
+  }
+
+  .candle-flame {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: candle-flicker 0.9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes lamp-flicker {
+  0%, 40%, 43%, 46%, 76%, 79%, 100% { opacity: 1; }
+  41% { opacity: 0.55; }
+  44.5% { opacity: 0.75; }
+  77.5% { opacity: 0.62; }
+}
+@keyframes fog-drift {
+  to { transform: translateX(-50%); }
+}
+@keyframes bat-flap {
+  to { transform: scaleY(0.35); }
+}
+@keyframes bat-cross {
+  0% { transform: translate(-70px, 0); opacity: 0; }
+  8% { opacity: 1; }
+  50% { transform: translate(50cqw, -22px); }
+  92% { opacity: 1; }
+  100% { transform: translate(calc(100cqw + 70px), 8px); opacity: 0; }
+}
+@keyframes bat-burst {
+  0% { transform: translate(0, 0) scale(0.35); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(var(--dx, 180px), var(--dy, -120px)) scale(1); opacity: 0; }
+}
+@keyframes ghost-rise {
+  from { transform: translateY(22px) scale(0.6); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes ghost-bob {
+  to { transform: translateY(-4px); }
+}
+@keyframes candle-flicker {
+  0% { transform: scale(1, 1) skewX(0deg); }
+  50% { transform: scale(0.92, 1.08) skewX(-4deg); }
+  100% { transform: scale(1.05, 0.94) skewX(3deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

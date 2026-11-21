@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { Check, Download } from "lucide-react";
+import { Check, Download, Ghost } from "lucide-react";
 import type { ResurrectionResult } from "@/types/autopsy";
 
 export interface GeneratedCodeViewProps {
@@ -34,6 +34,11 @@ export function GeneratedCodeView({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 id={headingId} className="font-display text-3xl uppercase leading-none tracking-notice">
           Generated FastAPI wrapper
+          {syntax_ok && (
+            <span aria-hidden="true" className="ghost-rise ml-3 inline-block align-[-0.1em]">
+              <Ghost className="h-7 w-7 text-tallow" strokeWidth={1.5} />
+            </span>
+          )}
         </h2>
         <button
           type="button"

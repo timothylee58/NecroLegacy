@@ -2,7 +2,8 @@
 import { useCallback, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent, KeyboardEvent } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { ArrowRight, CircleAlert, LoaderCircle, Upload } from "lucide-react";
+import { ArrowRight, BookOpen, CircleAlert, LoaderCircle, Receipt, ScrollText, type LucideIcon } from "lucide-react";
+import { Coffin } from "./illustrations";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ApiRequestError, type AutopsyClient, type SessionInput } from "@/lib/api-client";
@@ -16,10 +17,10 @@ export interface DropzoneModalProps {
   onOpenChange(open: boolean): void;
 }
 
-export const PRESETS: ReadonlyArray<{ id: PresetId; label: string; meta: string }> = [
-  { id: "ledger_1994", label: "1994 Mainframe Ledger Dump", meta: "1994_mainframe_ledger_dump.dat · fixed-width ledger" },
-  { id: "fnb_pos_corrupted", label: "Corrupted F&B Warehouse POS Batch", meta: "corrupted_fnb_warehouse_pos_batch.txt · POS batch" },
-  { id: "dotmatrix_manifest", label: "Faded Dot-Matrix Manifest", meta: "faded_dotmatrix_manifest.png · scanned manifest" },
+export const PRESETS: ReadonlyArray<{ id: PresetId; label: string; Icon: LucideIcon }> = [
+  { id: "ledger_1994", label: "1994 Mainframe Ledger Dump", Icon: BookOpen },
+  { id: "fnb_pos_corrupted", label: "Corrupted F&B Warehouse POS Batch", Icon: Receipt },
+  { id: "dotmatrix_manifest", label: "Faded Dot-Matrix Manifest", Icon: ScrollText },
 ];
 
 const UPLOAD_TIMEOUT_MS = 10_000;
@@ -130,7 +131,7 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
       <DialogContent>
         <div className="grid gap-2 pr-8">
           <DialogTitle>Begin an autopsy</DialogTitle>
-          <DialogDescription className="max-w-[52ch] text-sm leading-relaxed">
+          <DialogDescription className="sr-only">
             Drop a legacy dump, copybook or scan, or choose a built-in synthetic preset.
           </DialogDescription>
         </div>
@@ -154,10 +155,10 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
             dragging ? "border-tallow bg-tallow/10" : "border-foreground/30 hover:border-tallow hover:bg-accent",
           )}
         >
-          <Upload aria-hidden="true" className="h-5 w-5 text-tallow" />
+          <Coffin className="h-10 w-7 text-tallow" />
           <span className="font-semibold">Drop files here or press Enter to browse</span>
           <span className="font-mono text-xs text-muted-foreground">
-            Accepted: .dat .txt .csv .cpy up to 5 MB, .png .jpg .jpeg up to 10 MB
+            .dat .txt .csv .cpy ≤ 5 MB · .png .jpg ≤ 10 MB
           </span>
         </div>
         <input
@@ -174,7 +175,7 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
 
         <div className="grid gap-2">
           <p id="preset-heading" className="label">
-            Or open a synthetic case
+            Presets
           </p>
           <div role="radiogroup" aria-labelledby="preset-heading" className="grid border-y border-border">
             {PRESETS.map((p, i) => (
@@ -186,21 +187,16 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
                 type="button"
                 role="radio"
                 aria-label={p.label}
-                aria-describedby={`preset-${p.id}-meta`}
                 aria-checked={selected === p.id}
                 tabIndex={i === focusIndex ? 0 : -1}
                 onFocus={() => setFocusIndex(i)}
                 onClick={() => selectPreset(p.id)}
                 onKeyDown={(e) => onPresetKey(e, i, p.id)}
                 disabled={busy && selected !== p.id}
-                className="group grid grid-cols-[1fr_auto] items-center gap-x-4 border-t border-border px-1 py-3 text-left transition-colors first:border-t-0 hover:bg-accent aria-checked:bg-tallow/10"
+                className="group grid grid-cols-[auto_1fr_auto] items-center gap-x-4 border-t border-border px-1 py-3 text-left transition-colors first:border-t-0 hover:bg-accent aria-checked:bg-tallow/10"
               >
-                <span className="min-w-0">
-                  <span className="block font-semibold">{p.label}</span>
-                  <span id={`preset-${p.id}-meta`} className="block font-mono text-xs text-muted-foreground">
-                    {p.meta}
-                  </span>
-                </span>
+                <p.Icon aria-hidden="true" className="h-4 w-4 text-tallow/80" strokeWidth={1.75} />
+                <span className="min-w-0 font-semibold">{p.label}</span>
                 {busy && selected === p.id ? (
                   <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin text-tallow motion-reduce:animate-none" />
                 ) : (

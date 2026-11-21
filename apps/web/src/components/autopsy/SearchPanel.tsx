@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Tombstone } from "lucide-react";
 import type { AutopsyClient } from "@/lib/api-client";
 import type { SearchHit } from "@/types/autopsy";
 import { useAnnounce } from "./LiveAnnouncer";
@@ -64,11 +65,11 @@ export function SearchPanel({ client, sessionId, onHits }: SearchPanelProps) {
         <label htmlFor={inputId} className="font-display text-3xl uppercase leading-none tracking-notice">
           Search records
         </label>
-        <p className="text-sm text-muted-foreground">Ask in plain words, for example: transfers with missing branch codes.</p>
         <div className="flex gap-2">
           <input
             id={inputId}
             type="search"
+            placeholder="e.g. transfers with missing branch codes"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -94,7 +95,12 @@ export function SearchPanel({ client, sessionId, onHits }: SearchPanelProps) {
       </form>
 
       {status === "error" && <p role="alert" className="text-sm text-crimson-ink">Search failed. Try again.</p>}
-      {status === "done" && hits.length === 0 && <p className="text-sm text-muted-foreground">No records matched.</p>}
+      {status === "done" && hits.length === 0 && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Tombstone aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          No records matched.
+        </p>
+      )}
       {status === "done" && hits.length > 0 && (
         <ul aria-label={`${hits.length} search results`} className="flex flex-col border-t border-border">
           {hits.map((h) => (

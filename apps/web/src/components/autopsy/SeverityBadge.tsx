@@ -1,9 +1,9 @@
-import { Info, ShieldAlert, TriangleAlert } from "lucide-react";
+import { Info, Skull, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Severity } from "@/types/autopsy";
 
 const CONFIG = {
-  critical: { Icon: ShieldAlert, label: "Critical", tone: "text-crimson-ink" },
+  critical: { Icon: Skull, label: "Critical", tone: "text-crimson-ink" },
   medium: { Icon: TriangleAlert, label: "Medium", tone: "text-ochre" },
   low: { Icon: Info, label: "Low", tone: "text-formalin" },
 } as const;

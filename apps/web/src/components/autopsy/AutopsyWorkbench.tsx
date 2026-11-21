@@ -10,10 +10,12 @@ import {
   toSceneGraph,
 } from "@/lib/session-reducer";
 import type { CreateSessionResponse, SessionEvent } from "@/types/autopsy";
-import { Plus } from "lucide-react";
+import { Move3d, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AutopsyCanvasDynamic } from "./AutopsyCanvas";
 import { CoronersNotice } from "./CoronersNotice";
+import { EmptyTable } from "./EmptyTable";
+import { Cobweb, Fog, SurgicalLamp, ToeTag } from "./illustrations";
 import { AutopsySummary } from "./AutopsySummary";
 import { DropzoneModal, PRESETS } from "./DropzoneModal";
 import { EntityList } from "./EntityList";
@@ -136,14 +138,13 @@ function Workbench() {
         <div className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 md:px-8">
           <h1 className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
             <span className="font-display text-[1.9rem] uppercase leading-none tracking-notice">NecroLegacy</span>
-            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground">
-              Digital autopsy workbench
-            </span>
+            <span className="sr-only">Digital autopsy workbench</span>
           </h1>
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             {sourceName && (
               <p className="flex min-w-0 items-center gap-2 text-sm">
-                <span className="label">Active dump</span>
+                <ToeTag className="h-4 w-8 shrink-0 text-tallow" />
+                <span className="sr-only">Active dump: </span>
                 <span className="truncate font-mono text-foreground">{sourceName}</span>
               </p>
             )}
@@ -167,11 +168,6 @@ function Workbench() {
             anomalies={anomalies}
             servedFromCache={state.servedFromCache}
           />
-          {state.servedFromCache && (
-            <p role="note" className="text-sm text-muted-foreground">
-              Served from cache: this result was computed earlier.
-            </p>
-          )}
           {state.connection.status === "reconnecting" && (
             <p role="status" className="text-sm text-tallow">
               Reconnecting (attempt {state.connection.attempt})…
@@ -206,27 +202,18 @@ function Workbench() {
             <h2 id="procedure-heading" className="label border-b border-border pb-2">
               Procedure
             </h2>
-            {idle ? (
-              <p className="pt-3 text-sm text-muted-foreground">
-                Upload a legacy dump or choose a preset to begin the autopsy.
-              </p>
-            ) : (
-              <ProgressRail events={events} />
-            )}
+            <ProgressRail events={events} />
           </section>
-          <section aria-labelledby="specimens-heading" className="flex flex-col gap-3">
-            <h2 id="specimens-heading" className="label">
-              Specimens
-            </h2>
-            {entities.length > 0 ? (
+          {/* The summary is the canvas's description, and the canvas only exists once entities do. */}
+          {entities.length > 0 && (
+            <section aria-labelledby="specimens-heading" className="flex flex-col gap-3">
+              <h2 id="specimens-heading" className="label">
+                Specimens
+              </h2>
               <EntityList entities={entities} anomalies={anomalies} onOpen={openEntity} highlightedIds={highlighted} />
-            ) : (
-              <p className="border-y border-border py-3 text-sm text-muted-foreground">
-                {idle ? "Nothing on the table yet." : "Recovering entities…"}
-              </p>
-            )}
-            <AutopsySummary id={SUMMARY_ID} entities={entities} anomalies={anomalies} />
-          </section>
+              <AutopsySummary id={SUMMARY_ID} entities={entities} anomalies={anomalies} />
+            </section>
+          )}
         </aside>
 
         <div className={showXRay ? "grid min-w-0 gap-6 lg:[grid-area:table] xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" : "min-w-0 lg:[grid-area:table]"}>
@@ -251,21 +238,15 @@ function Workbench() {
             <div
               ref={canvasRegionRef}
               tabIndex={-1}
-              className="lamp-pool relative h-[clamp(22rem,56vh,38rem)] overflow-hidden border border-border"
+              className="lamp-pool relative h-[clamp(22rem,56vh,38rem)] overflow-hidden border border-border [container-type:inline-size]"
             >
-              {idle ? (
-                <div className="grid h-full place-items-center p-6 text-center">
-                  <div className="flex max-w-sm flex-col items-center gap-4">
-                    <p className="text-sm text-muted-foreground">
-                      The table is empty. Specimens appear here as a 3D constellation once the procedure starts.
-                    </p>
-                    {!dropzoneOpen && (
-                      <Button type="button" variant="outline" onClick={() => setDropzoneOpen(true)}>
-                        Open the intake
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              <div aria-hidden="true" className="lamp-glow pointer-events-none absolute inset-0" />
+              {entities.length === 0 ? (
+                <EmptyTable
+                  busy={state.phase === "running"}
+                  showIntake={idle && !dropzoneOpen}
+                  onOpenIntake={() => setDropzoneOpen(true)}
+                />
               ) : (
                 <AutopsyCanvasDynamic
                   entities={entities}
@@ -277,19 +258,25 @@ function Workbench() {
                   onOpenEntity={openEntity}
                 />
               )}
+              <SurgicalLamp className="pointer-events-none absolute left-1/2 top-0 w-36 -translate-x-1/2 text-foreground/45" />
+              <Cobweb className="pointer-events-none absolute left-0 top-0 w-24 text-foreground/20" />
+              <Cobweb className="pointer-events-none absolute right-0 top-0 w-16 -scale-x-100 text-foreground/15" />
+              <Fog />
             </div>
             {entities.length > 0 && (
               <ul aria-label="Table legend" className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
                 <li className="flex items-center gap-1.5">
-                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-crimson" /> Critical rot, traced along its links
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-crimson" /> Critical
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ochre" /> Low or medium findings
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-ochre" /> Findings
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-foreground" /> Healthy, steady pulse
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-foreground" /> Healthy
                 </li>
-                <li>Drag to orbit · select a specimen to open its evidence</li>
+                <li className="flex items-center gap-1.5">
+                  <Move3d aria-hidden="true" className="h-3.5 w-3.5" /> Drag to orbit
+                </li>
               </ul>
             )}
           </div>
