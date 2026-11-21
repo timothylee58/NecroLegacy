@@ -344,3 +344,14 @@ def test_invalid_reasoning_effort_is_rejected():
         make_settings().model_copy(update={}).model_validate(
             {**make_settings().model_dump(), "llm_fallback_reasoning_effort": "max"}
         )
+
+
+@respx.mock
+def test_schema_mismatch_names_paths_and_types_but_not_values(caplog):
+    reply = '{"value": 3.5, "secret_field": "' + BODY_CANARY + '"}'
+    respx.post(COMPAT_URL).mock(return_value=httpx.Response(200, json={"choices": [{"message": {"content": reply}}]}))
+    router = _compat_router(llm_fallback_model="")
+    with caplog.at_level(logging.WARNING, logger="necro.llm"), pytest.raises(ProviderFailure):
+        asyncio.run(router.complete(LLMRequest(purpose="t", system="s", user="u", response_model=Answer)))
+    assert "schema_mismatch[value:int_from_float]" in caplog.text
+    assert BODY_CANARY not in caplog.text and "3.5" not in caplog.text

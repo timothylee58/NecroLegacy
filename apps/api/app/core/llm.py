@@ -229,8 +229,8 @@ class LLMRouter:
             raise _AttemptFailed("validation", "no_text")
         try:
             return model.model_validate_json(strip_fences(text))
-        except ValidationError:
-            raise _AttemptFailed("validation", "schema_mismatch") from None
+        except ValidationError as exc:
+            raise _AttemptFailed("validation", f"schema_mismatch[{_error_codes(exc)}]") from None
 
     def bedrock_url(self, model: str) -> str:
         # Model ids contain ':' and inference-profile prefixes; SigV4 signs the encoded path, as boto3 does.
@@ -295,6 +295,23 @@ class LLMRouter:
 
 def _bearer(key: SecretStr) -> dict[str, str]:
     return {"Authorization": f"Bearer {key.get_secret_value()}"}
+
+
+def _error_codes(exc: ValidationError, limit: int = 3) -> str:
+    """Field path and error type of the first errors, e.g. `rows.0.2.bbox.y:int_from_float`.
+
+    Pydantic's `input` (the model's actual reply) is never included. Our own validators raise fixed messages,
+    so for `value_error` the message names which rule failed.
+    """
+    parts = []
+    for err in exc.errors(include_input=False, include_url=False)[:limit]:
+        loc = ".".join(str(p) for p in err["loc"]) or "root"
+        kind = err["type"]
+        if kind == "value_error":
+            kind = str(err["msg"]).removeprefix("Value error, ")[:60].replace(" ", "_")
+        parts.append(f"{loc}:{kind}")
+    more = exc.error_count() - len(parts)
+    return ",".join(parts) + (f",+{more}" if more > 0 else "")
 
 
 def _log_attempt(purpose: str, target: _Target, exc: _AttemptFailed) -> None:
