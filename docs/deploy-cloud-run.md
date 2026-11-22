@@ -36,9 +36,10 @@ account (a card) even when usage stays inside the free tier. The other services 
    session-level statement, and it keeps its own small connection pool. The API enables `vector` on first start.
 2. **Upstash**: create a Redis database in a region near `us-central1` and copy its `rediss://` URL.
 3. **AxForge**: create an API key at <https://axforge.ai> (no card). `deploy-api` uses `qwen3.8-flash-next` as the
-   primary and `qwen3.8-27b` as the fallback. Both read images, so a scan OCR is unsure about gets two attempts on
-   two different models. Both answer without thinking by default, which keeps replies inside the 30-second provider
-   timeout. AxForge rejects unknown request fields with a 400, so leave `LLM_*_REASONING_EFFORT` unset. Do not pick
+   primary and `qwen3.8-27b` as the fallback. Both answer without thinking by default. Text calls keep the normal
+   primary-then-fallback routing with a 30-second limit each. A scan OCR is unsure about gets one attempt of up to
+   50 seconds on the first model that reads images (the primary here): reading the manifest took over 30 seconds on
+   both models, and two 50-second attempts would not fit the vision step's 120-second budget. AxForge rejects unknown request fields with a 400, so leave `LLM_*_REASONING_EFFORT` unset. Do not pick
    `glm-5.3-flash`: it always thinks, sometimes for minutes. Prompts and replies are not stored, logged or used for
    training (hosted in Stockholm). The model list is public at `https://api.axforge.ai/v1/public/models`.
    Image calls cap replies at 2,560 tokens and ask for minified JSON. A 429 or 503 with a `retry-after` of 10 s or

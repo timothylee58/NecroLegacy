@@ -13,6 +13,9 @@ MAX_LONG_EDGE = 1568
 # About 35 tokens per minified cell, so this fits roughly 70 cells. Groq's free tier allows 8K tokens a minute
 # (reply cap included), and 4096 left too little room for the image and one retry.
 VISION_MAX_TOKENS = 2560
+# Reading a scan and writing every cell with its box took over 30 s on AxForge's Qwen models. One 50 s attempt fits
+# the vision node's 120 s budget after local OCR (up to 45 s); two would not.
+VISION_TIMEOUT_SECONDS = 50.0
 SYSTEM_PROMPT = (
     "You read tables from images of legacy printed documents. Return JSON only: "
     '{"rows": [[{"text": str, "bbox": {"x": int, "y": int, "width": int, "height": int}, "confidence": float}]]}. '
@@ -83,6 +86,8 @@ async def extract_with_llm(router: LLMRouter, gray: np.ndarray, events: EventSin
         response_model=model,
         images=[png],
         max_tokens=VISION_MAX_TOKENS,
+        timeout_seconds=VISION_TIMEOUT_SECONDS,
+        single_attempt=True,
     )
     try:
         result = await router.complete(request, events)

@@ -61,6 +61,10 @@ class LLMRequest[T: BaseModel]:
     # Providers such as Groq reserve max_tokens against the per-minute token budget, so callers whose replies are
     # known to be short should lower it.
     max_tokens: int = MAX_TOKENS
+    timeout_seconds: float = PROVIDER_TIMEOUT_SECONDS
+    # One model only, the first that is configured and can take the input. For calls too slow to fit two attempts
+    # in their node's time budget; the caller keeps its own deterministic fallback.
+    single_attempt: bool = False
 
 
 @dataclass
@@ -193,6 +197,8 @@ class LLMRouter:
         await self._client.aclose()
 
     async def complete[T: BaseModel](self, req: LLMRequest[T], events: EventSink | None = None) -> LLMResult[T]:
+        if req.single_attempt:
+            return await self._complete_single(req)
         attempts: list[ProviderAttempt] = []
         primary, fallback = self._targets
         fallback_ready = self._usable(fallback) and (fallback.vision or not req.images)
@@ -224,6 +230,22 @@ class LLMRouter:
             attempts.append(ProviderAttempt("fallback", exc.reason))
             raise ProviderFailure(attempts) from None
 
+    async def _complete_single[T: BaseModel](self, req: LLMRequest[T]) -> LLMResult[T]:
+        attempts: list[ProviderAttempt] = []
+        for target in self._targets:
+            if not self._usable(target):
+                attempts.append(ProviderAttempt(target.role, "not_configured"))
+            elif req.images and not target.vision:
+                attempts.append(ProviderAttempt(target.role, "unsupported_input"))
+            else:
+                try:
+                    return LLMResult(await self._call(target, req), target.role)
+                except _AttemptFailed as exc:
+                    _log_attempt(req.purpose, target, exc)
+                    attempts.append(ProviderAttempt(target.role, exc.reason))
+                    raise ProviderFailure(attempts) from None
+        raise ProviderFailure(attempts)
+
     async def _call[T: BaseModel](self, target: _Target, req: LLMRequest[T]) -> T:
         try:
             return await self._call_once(target, req)
@@ -246,10 +268,12 @@ class LLMRouter:
             return await self._call_bedrock(target, req)
         return await self._call_openai_compatible(target, req)
 
-    async def _post(self, url: str, headers: dict[str, str], content: bytes) -> dict[str, Any]:
+    async def _post(
+        self, url: str, headers: dict[str, str], content: bytes, timeout: float = PROVIDER_TIMEOUT_SECONDS
+    ) -> dict[str, Any]:
         # Exceptions are mapped to reason codes only so no response body or header value reaches a message.
         try:
-            response = await self._client.post(url, headers=headers, content=content, timeout=PROVIDER_TIMEOUT_SECONDS)
+            response = await self._client.post(url, headers=headers, content=content, timeout=timeout)
         except httpx.TimeoutException:
             raise _AttemptFailed("timeout") from None
         except httpx.HTTPError:
@@ -302,7 +326,7 @@ class LLMRouter:
             SigV4Auth(frozen, BEDROCK_SERVICE, self._region).add_auth(aws_req)
         except Exception:
             raise _AttemptFailed("error") from None
-        data = await self._post(url, dict(aws_req.headers.items()), body)
+        data = await self._post(url, dict(aws_req.headers.items()), body, req.timeout_seconds)
         try:
             blocks = data["output"]["message"]["content"]
             # Reasoning models emit reasoningContent blocks before the answer; take the first text block.
@@ -326,7 +350,9 @@ class LLMRouter:
         if target.reasoning_effort is not None:
             payload["reasoning_effort"] = target.reasoning_effort
         headers = {**_bearer(self._api_key), "Content-Type": "application/json"}
-        data = await self._post(f"{self._base_url}/chat/completions", headers, json.dumps(payload).encode())
+        data = await self._post(
+            f"{self._base_url}/chat/completions", headers, json.dumps(payload).encode(), req.timeout_seconds
+        )
         try:
             choice = data["choices"][0]
             text = choice["message"]["content"]

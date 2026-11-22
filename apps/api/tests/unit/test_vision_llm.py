@@ -4,10 +4,11 @@ import numpy as np
 import pytest
 import respx
 
-from app.core.llm import LLMRouter
+from app.agents.runtime import Timeouts
+from app.core.llm import MAX_RETRY_WAIT_SECONDS, LLMRouter
 from app.services.vision import VisionError
-from app.services.vision_llm import extract_with_llm, prepare_image
-from tests.property.test_llm_router import FALLBACK_URL, aws_credentials, make_settings
+from app.services.vision_llm import VISION_TIMEOUT_SECONDS, extract_with_llm, prepare_image
+from tests.property.test_llm_router import FALLBACK_URL, PRIMARY_URL, aws_credentials, make_settings
 
 
 def table(cells: list[dict], rows: int = 1) -> dict:
@@ -64,3 +65,39 @@ async def test_empty_rows_fail() -> None:
     )
     with pytest.raises(VisionError):
         await extract_with_llm(vision_router(), np.full((300, 800), 255, np.uint8))
+
+
+def test_one_vision_attempt_fits_the_node_budget() -> None:
+    t = Timeouts()
+    # Local OCR, an immediate rate-limit answer, the one retry wait, then the single full-length attempt.
+    assert t.vision_local + MAX_RETRY_WAIT_SECONDS + VISION_TIMEOUT_SECONDS < t.vision_node
+
+
+@respx.mock
+async def test_vision_call_gets_its_own_timeout() -> None:
+    route = respx.post(FALLBACK_URL).mock(return_value=httpx.Response(200, json=table([cell(100)])))
+    await extract_with_llm(vision_router(), np.full((300, 800), 255, np.uint8))
+    assert route.calls[0].request.extensions["timeout"]["read"] == VISION_TIMEOUT_SECONDS
+
+
+@respx.mock
+async def test_vision_tries_only_one_model() -> None:
+    # A vision-capable primary is tried alone; its failure is not followed by a second slow attempt.
+    primary = respx.post(PRIMARY_URL).mock(side_effect=httpx.ReadTimeout("slow"))
+    fallback = respx.post(FALLBACK_URL).mock(return_value=httpx.Response(200, json=table([cell(100)])))
+    router = LLMRouter(
+        make_settings().model_copy(update={"llm_primary_vision": True}), aws_credentials=aws_credentials()
+    )
+    with pytest.raises(VisionError) as e:
+        await extract_with_llm(router, np.full((300, 800), 255, np.uint8))
+    assert e.value.code == "no_table_detected"
+    assert primary.call_count == 1 and fallback.call_count == 0
+
+
+@respx.mock
+async def test_text_only_primary_is_skipped_for_the_single_vision_attempt() -> None:
+    primary = respx.post(PRIMARY_URL).mock(return_value=httpx.Response(200, json=table([cell(100)])))
+    fallback = respx.post(FALLBACK_URL).mock(side_effect=httpx.ReadTimeout("slow"))
+    with pytest.raises(VisionError):
+        await extract_with_llm(vision_router(), np.full((300, 800), 255, np.uint8))
+    assert primary.call_count == 0 and fallback.call_count == 1
