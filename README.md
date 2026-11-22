@@ -58,7 +58,7 @@ apps/api/.venv/bin/python scripts/check_readme_env.py
 
 ## Environment variables
 
-The free deployment runs the web app as a Render static site (`render.yaml`) and the API on Google Cloud Run, with Neon for Postgres + pgvector, Upstash for Redis and Groq for the LLM. Step-by-step setup, the reasoning behind each setting and a cost breakdown are in [docs/deploy-cloud-run.md](docs/deploy-cloud-run.md); `.github/workflows/deploy-api.yml` redeploys the API after CI passes on `main`. The API is a plain container (root `Dockerfile`), so any host with about 2 GB of memory and a single instance works. Never commit values; `.env` is git-ignored.
+The free deployment runs the web app as a Render static site (`render.yaml`) and the API on Google Cloud Run, with Neon for Postgres + pgvector, Upstash for Redis and AxForge for the LLM. Step-by-step setup, the reasoning behind each setting and a cost breakdown are in [docs/deploy-cloud-run.md](docs/deploy-cloud-run.md); `.github/workflows/deploy-api.yml` redeploys the API after CI passes on `main`. The API is a plain container (root `Dockerfile`), so any host with about 2 GB of memory and a single instance works. Never commit values; `.env` is git-ignored.
 
 `NEXT_PUBLIC_*` values are baked in at build time, so redeploy the site after changing them.
 
@@ -67,12 +67,12 @@ The free deployment runs the web app as a Render static site (`render.yaml`) and
 | `WEB_ORIGIN` | Browser origin allowed by CORS (single origin, no wildcard) | - | required |
 | `REDIS_URL` | Redis connection URL for the result cache | - | required |
 | `DATABASE_URL` | Postgres with pgvector for record search. Use the **direct** (non-pooled) string, Neon's `DATABASE_URL_UNPOOLED`. `SUPABASE_DB_URL` is accepted as an alias | - | required |
-| `LLM_PROVIDER` | `bedrock` (default) or `openai_compatible`; the free deployment uses `openai_compatible` with Groq | - | optional |
-| `LLM_PRIMARY_MODEL` | Primary open-weight model id (default `openai.gpt-oss-120b-1:0`; `openai/gpt-oss-120b` on Groq) | - | optional |
+| `LLM_PROVIDER` | `bedrock` (default) or `openai_compatible`; the free deployment uses `openai_compatible` with AxForge | - | optional |
+| `LLM_PRIMARY_MODEL` | Primary open-weight model id (default `openai.gpt-oss-120b-1:0`; `qwen3.8-flash-next` on AxForge) | - | optional |
 | `LLM_PRIMARY_VISION` | `true` if the primary model accepts images (default false) | - | optional |
-| `LLM_FALLBACK_MODEL` | Fallback model id, Claude on Bedrock by default; a vision model on Groq | - | optional |
+| `LLM_FALLBACK_MODEL` | Fallback model id, Claude on Bedrock by default; `qwen3.8-27b` on AxForge | - | optional |
 | `LLM_PRIMARY_REASONING_EFFORT` | `none`, `low`, `medium` or `high`, sent as `reasoning_effort` to the primary on `openai_compatible` only when set. gpt-oss accepts only low/medium/high | - | optional |
-| `LLM_FALLBACK_REASONING_EFFORT` | Same for the fallback. The free deployment sets `none`, Qwen's instruct mode, so scanned images get a direct JSON answer | - | optional |
+| `LLM_FALLBACK_REASONING_EFFORT` | Same for the fallback. Leave both unset on AxForge, which rejects unknown request fields; its Qwen models answer without thinking by default | - | optional |
 | `LLM_FALLBACK_VISION` | `true` if the fallback model accepts images (default true) | - | optional |
 | `AWS_REGION` | Bedrock region | - | optional |
 | `AWS_ACCESS_KEY_ID` | Bedrock credential; leave unset when using an IAM role | - | optional |

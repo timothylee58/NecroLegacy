@@ -6,7 +6,7 @@
 | API | Google Cloud Run, request-based billing | 180,000 vCPU-seconds, 360,000 GiB-seconds and 2 million requests a month |
 | Postgres + pgvector | Neon Free | 1 GB storage, 100 compute-hours a month, wakes on its own after idling |
 | Redis cache | Upstash Free | 256 MB, 500,000 commands a month |
-| LLM | Groq Free, through `LLM_PROVIDER=openai_compatible` | About 30 requests a minute and 200,000 tokens a day on `openai/gpt-oss-120b` |
+| LLM | AxForge Free, through `LLM_PROVIDER=openai_compatible` | 3 million tokens every 30 days, shared across models; up to 8 calls at once |
 | Embeddings | Built-in local `hash` provider | No external service |
 
 Free-tier figures change; check each provider's pricing page before relying on them. Google Cloud needs a billing
@@ -35,15 +35,16 @@ account (a card) even when usage stays inside the free tier. The other services 
    and `DATABASE_URL_UNPOOLED` (direct). The API needs the **direct** one: its startup runs `CREATE EXTENSION`, a
    session-level statement, and it keeps its own small connection pool. The API enables `vector` on first start.
 2. **Upstash**: create a Redis database in a region near `us-central1` and copy its `rediss://` URL.
-3. **Groq**: create an API key. The fallback model, which reads scanned images when OCR is unsure, defaults to
-   `qwen/qwen3.8-27b`, Groq's generally available vision model in November 2026. `deploy-api` sends it
-   `reasoning_effort: "none"` (Qwen's instruct mode): in its default thinking mode the reasoning ran past the
-   30-second provider timeout or the 4,096-token reply limit, so scans fell back to local OCR. If Groq retires the
-   model, set `LLM_FALLBACK_MODEL` and check whether the new one accepts `none` (`LLM_FALLBACK_REASONING_EFFORT`).
-   On the free tier the vision model allows 8,000 tokens a minute, and Groq counts the reply cap against it, so
-   image calls cap replies at 2,560 tokens and ask for minified JSON. A 429 with `retry-after` of 10 s or less is
-   retried once on the same model; every 429 logs Groq's `x-ratelimit-*` counters as
-   `llm rate limited: host=… remaining-tokens=… reset-tokens=…`.
+3. **AxForge**: create an API key at <https://axforge.ai> (no card). `deploy-api` uses `qwen3.8-flash-next` as the
+   primary and `qwen3.8-27b` as the fallback. Both read images, so a scan OCR is unsure about gets two attempts on
+   two different models. Both answer without thinking by default, which keeps replies inside the 30-second provider
+   timeout. AxForge rejects unknown request fields with a 400, so leave `LLM_*_REASONING_EFFORT` unset. Do not pick
+   `glm-5.3-flash`: it always thinks, sometimes for minutes. Prompts and replies are not stored, logged or used for
+   training (hosted in Stockholm). The model list is public at `https://api.axforge.ai/v1/public/models`.
+   Image calls cap replies at 2,560 tokens and ask for minified JSON. A 429 or 503 with a `retry-after` of 10 s or
+   less is retried once on the same model, and every 429 or 413 is logged as `llm rate limited: host=… status=…`
+   with whatever limit details the provider returns. We moved off Groq in November 2026 because its free tier
+   (8,000 tokens a minute, 200,000 a day) refused image calls for most of a day of testing.
 
 ## 2. Google Cloud (one time)
 
@@ -73,7 +74,7 @@ gcloud artifacts repositories set-cleanup-policies necrolegacy --location="$REGI
 sed -n 's/^DATABASE_URL_UNPOOLED=//p' .env.local | tr -d '"\n' | gcloud secrets create necro-db-url --data-file=-
 read -rs "REDIS_URL?Upstash rediss:// URL: " && echo
 printf '%s' "$REDIS_URL" | gcloud secrets create necro-redis-url --data-file=-
-read -rs "LLM_KEY?Groq API key: " && echo
+read -rs "LLM_KEY?AxForge API key: " && echo
 printf '%s' "$LLM_KEY" | gcloud secrets create necro-llm-key --data-file=-
 unset DB_URL REDIS_URL LLM_KEY
 # If a secret already exists (or a value was wrong), add a new version instead of creating it; deploys read
@@ -120,8 +121,11 @@ gh variable set GCP_RUNTIME_SA --body "$RUNTIME_SA"
 gh variable set WEB_ORIGIN --body "https://necrolegacy-web.onrender.com"   # the Render URL from step 5
 ```
 
-Optional overrides: `LLM_BASE_URL` (default `https://api.groq.com/openai/v1`), `LLM_PRIMARY_MODEL` (default
-`openai/gpt-oss-120b`) and `LLM_FALLBACK_MODEL` (default `qwen/qwen3.8-27b`). None of these are secrets; secrets stay in Secret Manager.
+Optional overrides: `LLM_BASE_URL` (default `https://api.axforge.ai/v1`), `LLM_PRIMARY_MODEL` (default
+`qwen3.8-flash-next`), `LLM_PRIMARY_VISION` (default `true`), `LLM_FALLBACK_MODEL` (default `qwen3.8-27b`) and
+`LLM_PRIMARY_REASONING_EFFORT` / `LLM_FALLBACK_REASONING_EFFORT` (default unset). For a text-only primary such as
+Groq's `openai/gpt-oss-120b`, set `LLM_PRIMARY_VISION=false` so images go straight to the fallback. None of these
+are secrets; secrets stay in Secret Manager.
 
 ## 4. Deploy the API
 
@@ -142,13 +146,13 @@ handful of Redis commands.
 | Item | Per autopsy | Free capacity a month | After the free tier |
 |---|---|---|---|
 | Cloud Run (1 vCPU, 2 GiB, about 10 s with the stream open) | about 10 vCPU-s and 20 GiB-s | about 18,000 autopsies | about $0.0003 per autopsy; continuous use is about $0.10 an hour |
-| Groq `gpt-oss-120b` | 2,000 to 4,000 tokens | about 50 to 100 autopsies a day | Groq Developer at $0.15 / $0.60 per million tokens, about $0.002 per autopsy |
+| AxForge `qwen3.8-flash-next` | 2,000 to 4,000 tokens; a scan adds about 1,500 to 4,000 | about 750 to 1,500 autopsies a month | paid from a prepaid balance; with no balance, calls fail with 402 and nothing is charged |
 | Neon | about 1 MB for a preset, kept 24 hours | 1 GB at once | paid plans from $0.106 per compute-hour |
 | Upstash | about 10 commands | about 50,000 autopsies | $0.20 per 100,000 commands |
 | Artifact Registry | none | 0.5 GB (two images) | $0.10 per GB-month |
 | Render static site | none | free | — |
 
-When Groq's daily limit runs out, autopsies still finish: the deterministic and ML findings are unaffected and the
+When the LLM allowance runs out, autopsies still finish: the deterministic and ML findings are unaffected and the
 LLM explanations are marked skipped. The faded dot-matrix preset reads poorly with tesseract (mean confidence about
 0.35), so it asks the vision model first; if that model is missing, rate-limited or returns nothing, the API keeps
 the local OCR cells and the Vision X-Ray marks most of them low-confidence. For comparison, the Bedrock setup costs about $0.002 per autopsy with

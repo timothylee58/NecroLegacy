@@ -16,7 +16,7 @@ Delivery order is fixed by Requirement 19.8: **Phase 1** web app on typed mock d
 | Web | Next.js 15 App Router, React 19 function components, TypeScript `strict`, Tailwind, shadcn/ui (Radix), Framer Motion, Three.js, Vitest + Testing Library + fast-check, Playwright + `@axe-core/playwright` |
 | API | Python 3.12, FastAPI, Pydantic v2 + pydantic-settings, LangGraph `StateGraph`, httpx (LLM calls), `redis.asyncio`, `psycopg[binary,pool]` 3 + `pgvector`, `opencv-python-headless`, `numpy`, `scikit-learn`, PaddleOCR (CPU) + Tesseract, Jinja2 (codegen), pytest, pytest-asyncio, Hypothesis, respx, fakeredis |
 | MCP | TypeScript on Node 20, `@modelcontextprotocol/sdk` (stdio transport), `ajv` for input validation, Vitest + fast-check |
-| Infra | Render static site (web, `output: "export"`, `render.yaml`), Google Cloud Run (api, root `Dockerfile`, one instance, request-based billing), Neon Postgres + pgvector, Upstash Redis, Groq as the OpenAI-compatible LLM endpoint, GitHub Actions (`deploy-api.yml`); see `docs/deploy-cloud-run.md` |
+| Infra | Render static site (web, `output: "export"`, `render.yaml`), Google Cloud Run (api, root `Dockerfile`, one instance, request-based billing), Neon Postgres + pgvector, Upstash Redis, AxForge as the OpenAI-compatible LLM endpoint, GitHub Actions (`deploy-api.yml`); see `docs/deploy-cloud-run.md` |
 
 Decisions that were open and are now closed:
 
