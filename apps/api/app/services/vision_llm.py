@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 import cv2
 import numpy as np
@@ -42,6 +42,12 @@ class LLMCell(BaseModel):
 class VisionTable(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rows: list[list[LLMCell]]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _bare_rows(cls, value: Any) -> Any:
+        # AxForge's Qwen sometimes answers with the rows array alone (logged as schema_mismatch[root:model_type]).
+        return {"rows": value} if isinstance(value, list) else value
 
 
 def table_model_for(width: int, height: int) -> type[VisionTable]:

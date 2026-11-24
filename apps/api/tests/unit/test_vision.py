@@ -120,3 +120,48 @@ def test_misalignment_threshold_is_exclusive() -> None:
     assert not [d for d in find_defects(cells) if d.type == "misaligned_column"]
     cells[-1] = item(4, 1, "3", cx=125.5)
     assert [d for d in find_defects(cells) if d.type == "misaligned_column"]
+
+
+class SizeEngine:
+    """Reads small crops well and full-size ones badly, like dot-matrix print; widths identify each pass."""
+
+    name = "tesseract"
+
+    def __init__(self, fail_small: bool = False) -> None:
+        self.widths: list[int] = []
+        self.fail_small = fail_small
+
+    def read(self, crop: np.ndarray) -> tuple[str, float]:
+        w = crop.shape[1]
+        self.widths.append(w)
+        if w >= 90:
+            return "garbled", 0.2
+        if self.fail_small:
+            raise RuntimeError("engine down")
+        return ("12.5", 0.9) if w >= 50 else ("12", 0.6)
+
+
+def test_low_confidence_reads_are_rescued_at_smaller_scales() -> None:
+    engine = SizeEngine()
+    r = analyze(skewed_table_png(0), "tesseract", {"tesseract": engine})
+    assert {c.text for c in r.cells} == {"12.5"} and r.needs_fallback is None
+    # Each cell keeps its most confident read, not the last one.
+    assert all(c.confidence == 0.9 for c in r.cells)
+    assert len(engine.widths) == 3 * len(r.cells)
+
+
+def test_boxes_are_unchanged_by_the_rescue_pass() -> None:
+    plain = analyze(skewed_table_png(0), "tesseract", {"tesseract": StubEngine(confidences=[0.9])})
+    rescued = analyze(skewed_table_png(0), "tesseract", {"tesseract": SizeEngine()})
+    assert [c.bbox for c in rescued.cells] == [c.bbox for c in plain.cells]
+
+
+def test_confident_first_pass_skips_the_rescue() -> None:
+    engine = StubEngine(confidences=[0.9])
+    r = analyze(skewed_table_png(0), "tesseract", {"tesseract": engine})
+    assert engine.calls == len(r.cells)
+
+
+def test_failed_rescue_pass_keeps_the_first_reads() -> None:
+    r = analyze(skewed_table_png(0), "tesseract", {"tesseract": SizeEngine(fail_small=True)})
+    assert {c.text for c in r.cells} == {"garbled"} and r.needs_fallback == "low_confidence"

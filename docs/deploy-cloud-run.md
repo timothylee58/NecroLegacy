@@ -154,7 +154,41 @@ handful of Redis commands.
 | Render static site | none | free | — |
 
 When the LLM allowance runs out, autopsies still finish: the deterministic and ML findings are unaffected and the
-LLM explanations are marked skipped. The faded dot-matrix preset reads poorly with tesseract (mean confidence about
-0.35), so it asks the vision model first; if that model is missing, rate-limited or returns nothing, the API keeps
-the local OCR cells and the Vision X-Ray marks most of them low-confidence. For comparison, the Bedrock setup costs about $0.002 per autopsy with
+LLM explanations are marked skipped. Scanned images do not depend on the LLM for a readable result: when the first
+tesseract pass is unsure, each cell is read again at 0.6x and 0.5x and keeps its most confident read, because
+shrinking fuses dot-matrix dots into strokes. The faded dot-matrix preset goes from a mean confidence of 0.35 to
+0.86 this way, so it no longer calls the vision model at all; its smudged, torn and faded cells stay low-confidence
+in the Vision X-Ray. Only images that stay unsure after that pass go to the vision model. For comparison, the Bedrock setup costs about $0.002 per autopsy with
 `gpt-oss-120b` and about $0.03 to $0.07 when the Claude Sonnet 4.5 fallback answers.
+
+## Switching LLM provider
+
+The router talks to one OpenAI-compatible endpoint with one key, so a provider needs a text model and a vision model
+on the same base URL. Switching takes no code change and no CI run:
+
+```sh
+# 1. New key as a new version of the same secret (never echoed or written to history).
+read -rs "LLM_KEY?API key: " && echo
+printf '%s' "$LLM_KEY" | gcloud secrets versions add necro-llm-key --data-file=- --project necrolegacy-api
+unset LLM_KEY
+# 2. Point the deploy at the provider, for example back to Groq:
+gh variable set LLM_BASE_URL --body "https://api.groq.com/openai/v1"
+gh variable set LLM_PRIMARY_MODEL --body "openai/gpt-oss-120b"
+gh variable set LLM_PRIMARY_VISION --body "false"
+gh variable set LLM_FALLBACK_MODEL --body "qwen/qwen3.8-27b"
+gh variable set LLM_FALLBACK_REASONING_EFFORT --body "none"
+# 3. Redeploy with the current image settings.
+gh workflow run deploy-api --ref main
+```
+
+`gh variable delete <NAME>` returns a setting to the AxForge default in `deploy-api.yml`. Check the provider's model
+list first, and whether it accepts `reasoning_effort` (AxForge rejects unknown fields with a 400).
+
+## Before a live demo
+
+- Open the site and run one preset a few minutes ahead. Cloud Run scales to zero, so the first request after a quiet
+  spell waits for a cold start, and Neon's compute wakes on the first query.
+- Run the three presets once: their results are cached in Redis for 24 hours, so during the demo each one replays
+  in under a second, even if the LLM provider is having a bad day.
+- Do not leave an uptime monitor pointed at the API; it keeps the instance awake and billed.
+

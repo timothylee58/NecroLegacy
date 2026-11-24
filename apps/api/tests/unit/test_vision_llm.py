@@ -1,3 +1,5 @@
+import json
+
 import cv2
 import httpx
 import numpy as np
@@ -101,3 +103,13 @@ async def test_text_only_primary_is_skipped_for_the_single_vision_attempt() -> N
     with pytest.raises(VisionError):
         await extract_with_llm(vision_router(), np.full((300, 800), 255, np.uint8))
     assert primary.call_count == 0 and fallback.call_count == 1
+
+
+@respx.mock
+async def test_bare_rows_array_is_accepted() -> None:
+    bare = "[[" + json.dumps(cell(100)) + "]]"
+    respx.post(FALLBACK_URL).mock(
+        return_value=httpx.Response(200, json={"output": {"message": {"content": [{"text": bare}]}}})
+    )
+    result = await extract_with_llm(vision_router(), np.full((300, 800), 255, np.uint8))
+    assert len(result.cells) == 1 and result.cells[0].text == "AB"
