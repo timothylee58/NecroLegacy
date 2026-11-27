@@ -50,6 +50,8 @@ _FENCE = re.compile(r"^\s*```[A-Za-z0-9_-]*\s*\n(.*?)\n?```\s*$", re.DOTALL)
 class EventSink(Protocol):
     async def emit_fallback(self, failed_provider: Literal["primary"], reason: FallbackReason) -> None: ...
 
+    def note_degraded(self, cause: str) -> None: ...
+
 
 @dataclass
 class LLMRequest[T: BaseModel]:
@@ -197,8 +199,18 @@ class LLMRouter:
         await self._client.aclose()
 
     async def complete[T: BaseModel](self, req: LLMRequest[T], events: EventSink | None = None) -> LLMResult[T]:
-        if req.single_attempt:
-            return await self._complete_single(req)
+        try:
+            if req.single_attempt:
+                return await self._complete_single(req)
+            return await self._complete_routed(req, events)
+        except BaseException:
+            # A provider failure, or the caller's own deadline cancelling this call. Either way the run finishes
+            # without this answer, and a later run may get it, so the result must not be cached.
+            if events is not None:
+                events.note_degraded(f"llm:{req.purpose}")
+            raise
+
+    async def _complete_routed[T: BaseModel](self, req: LLMRequest[T], events: EventSink | None) -> LLMResult[T]:
         attempts: list[ProviderAttempt] = []
         primary, fallback = self._targets
         fallback_ready = self._usable(fallback) and (fallback.vision or not req.images)

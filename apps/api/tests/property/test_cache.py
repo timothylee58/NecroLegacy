@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import fakeredis
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -113,3 +114,63 @@ def test_failed_sessions_are_not_stored():
         return stored, await redis.exists("k")
 
     assert run(go()) == (False, 0)
+
+
+def _snapshot(**parts):
+    from app.schemas.autopsy import SessionSnapshot
+
+    base = {
+        "session_id": "s",
+        "input_kind": "text",
+        "status": "completed",
+        "served_from_cache": False,
+        "node_status": {},
+        "last_event_id": 1,
+    }
+    return SessionSnapshot.model_validate({**base, **parts})
+
+
+def _resurrection(status, reason=None):
+    return {
+        "source": None,
+        "syntax_ok": False,
+        "syntax_error": None,
+        "indexing": {"status": status, "record_count": 0, "reason": reason},
+        "models": [],
+    }
+
+
+@pytest.mark.parametrize(
+    ("events", "parts", "expected"),
+    [
+        ([], {}, set()),
+        (
+            [SessionEvent(id=1, type="node", node="ml_rot_scorer", state="skipped", payload={"reason": "timeout"})],
+            {},
+            {"ml_rot_scorer:timeout"},
+        ),
+        # Too few rows is a property of the input: the same bytes always give the same answer.
+        (
+            [
+                SessionEvent(
+                    id=1, type="node", node="ml_rot_scorer", state="skipped", payload={"reason": "insufficient_rows"}
+                )
+            ],
+            {},
+            set(),
+        ),
+        ([], {"resurrection": _resurrection("failed", "store_unreachable")}, {"indexing:store_unreachable"}),
+        ([], {"resurrection": _resurrection("failed", "store_unavailable")}, set()),
+        ([], {"resurrection": _resurrection("indexed")}, set()),
+    ],
+)
+def test_degraded_causes(events, parts, expected):
+    from app.services.cache import degraded_causes
+
+    assert degraded_causes(events, _snapshot(**parts)) == expected
+
+
+def test_cache_key_carries_the_pipeline_version():
+    from app.services.cache import PIPELINE_VERSION, cache_key
+
+    assert cache_key(b"x").startswith(f"necro:result:v{PIPELINE_VERSION}:")

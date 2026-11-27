@@ -89,10 +89,14 @@ class Sink:
     def __init__(self, log: list[str]) -> None:
         self.log = log
         self.calls: list[tuple[str, str]] = []
+        self.degraded: list[str] = []
 
     async def emit_fallback(self, failed_provider, reason) -> None:
         self.calls.append((failed_provider, reason))
         self.log.append("fallback_event")
+
+    def note_degraded(self, cause: str) -> None:
+        self.degraded.append(cause)
 
 
 def run(
@@ -183,6 +187,8 @@ def test_router_ordering(primary, fallback, with_image, primary_vision, provider
             fallback,
             [b"\x89PNG"] if with_image else None,
         )
+    # A call that ends without an answer marks the run degraded (so it is not cached); a fallback that answers does not.
+    assert sink.degraded == ([] if failure is None else ["llm:test"])
 
     if with_image and not primary_vision:
         # Text-only primary is skipped for images without a fallback event.
@@ -478,3 +484,19 @@ def test_rate_limit_log_survives_a_non_json_body(caplog):
     with caplog.at_level(logging.WARNING, logger="necro.llm"), pytest.raises(ProviderFailure):
         asyncio.run(_compat_router(llm_fallback_model="").complete(LLMRequest("t", "s", "u", Answer)))
     assert "status=429 no_rate_limit_detail" in caplog.text and BODY_CANARY not in caplog.text
+
+
+def test_call_cancelled_by_the_callers_deadline_marks_the_run_degraded(monkeypatch):
+    async def slow_call(self, target, req):
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(LLMRouter, "_call_once", slow_call)
+    sink = Sink([])
+
+    async def go():
+        async with asyncio.timeout(0.05):
+            await _compat_router().complete(LLMRequest("t", "s", "u", Answer), sink)
+
+    with pytest.raises(TimeoutError):
+        asyncio.run(go())
+    assert sink.degraded == ["llm:t"]

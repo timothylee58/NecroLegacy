@@ -276,3 +276,37 @@ def test_cached_first_byte_is_fast_for_large_payload():
         with c.stream("GET", f"/api/sessions/{res.json()['session_id']}/events") as s:
             next(s.iter_bytes())
         assert time.perf_counter() - start < 0.3
+
+
+def test_degraded_run_is_not_cached_but_a_clean_one_is(monkeypatch):
+    import asyncio as _asyncio
+
+    from app.core.llm import ProviderFailure
+
+    class FlakyRouter:
+        """Has a provider, but every call fails the way an outage or rate limit does."""
+
+        def has_provider(self) -> bool:
+            return True
+
+        async def complete(self, req, events=None):
+            if events is not None:
+                events.note_degraded(f"llm:{req.purpose}")
+            await _asyncio.sleep(0)
+            raise ProviderFailure([])
+
+    ctx = make_ctx()
+    ctx.router = FlakyRouter()  # type: ignore[assignment]
+    with TestClient(create_app(ctx.settings, ctx)) as c:
+        sid, cached = run_preset(c)
+        frames, _ = stream(c, sid)
+        assert not cached and '"completed"' in frames[-1][1]
+        _, cached_again = run_preset(c)
+        assert not cached_again, "a run whose LLM calls failed must be recomputed, not replayed"
+    # With no provider configured at all the result is stable, so it is cached as before.
+    clean = make_ctx()
+    with TestClient(create_app(clean.settings, clean)) as c:
+        sid, _ = run_preset(c)
+        stream(c, sid)
+        _, cached_clean = run_preset(c)
+        assert cached_clean

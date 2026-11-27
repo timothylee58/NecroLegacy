@@ -17,6 +17,9 @@ class EventLog:
         self._lock = asyncio.Lock()
         self._cond = asyncio.Condition()
         self._closed = any(e.type == "terminal" for e in self._events)
+        # Transient failures behind a "completed" run (e.g. an LLM call that failed). Kept off the event stream so a
+        # cached replay stays byte-identical; used only to decide whether the result may be cached.
+        self.degraded: set[str] = set()
 
     @property
     def last_id(self) -> int:
@@ -28,6 +31,9 @@ class EventLog:
 
     def events(self) -> list[SessionEvent]:
         return list(self._events)
+
+    def mark_degraded(self, cause: str) -> None:
+        self.degraded.add(cause)
 
     async def append(
         self,

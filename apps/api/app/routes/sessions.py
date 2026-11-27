@@ -22,7 +22,7 @@ from app.schemas.autopsy import (
     Severity,
 )
 from app.services import file_checks
-from app.services.cache import cache_key
+from app.services.cache import cache_key, degraded_causes
 from app.services.presets import get_preset, read_preset
 from app.services.sessions import Session
 
@@ -72,7 +72,12 @@ async def _execute(ctx: AppContext, session: Session, raw: RawInput, cache_id: s
         snapshot = session.snapshot()
         session.indexed = snapshot.resurrection is not None and snapshot.resurrection.indexing.status == "indexed"
         if ctx.cache is not None:
-            await ctx.cache.set(cache_id, session.input_kind, events)
+            # ResultCache.set itself refuses runs that did not complete.
+            causes = session.log.degraded | degraded_causes(events, snapshot)
+            if causes:
+                logger.info("result not cached; transient failures: %s", ",".join(sorted(causes)))
+            else:
+                await ctx.cache.set(cache_id, session.input_kind, events)
     finally:
         if acquired:
             ctx.semaphore.release()

@@ -92,3 +92,6 @@ class BusEventSink:
 
     async def emit_fallback(self, failed_provider: Literal["primary"], reason: FallbackReason) -> None:
         await self._bus.append("fallback", {"failed_provider": failed_provider, "reason": reason})
+
+    def note_degraded(self, cause: str) -> None:
+        self._bus.mark_degraded(cause)

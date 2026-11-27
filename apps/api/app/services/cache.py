@@ -10,11 +10,14 @@ from typing import Any, Literal
 from redis.asyncio import Redis
 
 from app.core.config import _int_in_range
-from app.schemas.autopsy import SessionEvent
+from app.schemas.autopsy import SessionEvent, SessionSnapshot
 
 logger = logging.getLogger("necro.cache")
 
-KEY_PREFIX = "necro:result:"
+# Bump PIPELINE_VERSION whenever a change alters what the pipeline returns for the same bytes (an OCR pass, a new
+# check), so results computed by older code are not replayed for up to a day after the deploy.
+PIPELINE_VERSION = 2
+KEY_PREFIX = f"necro:result:v{PIPELINE_VERSION}:"
 FORMAT_VERSION = 1
 REDIS_TIMEOUT_SECONDS = 2
 TTL_MIN, TTL_MAX, TTL_DEFAULT = 60, 604_800, 86_400
@@ -60,6 +63,26 @@ def decode(blob: bytes) -> CachedResult:
     except Exception:
         raise CacheDecodeError("unreadable cache entry") from None
     return CachedResult(input_kind=body["input_kind"], events=events)
+
+
+# Indexing reasons that describe the input or the deployment, not a passing outage; those results are stable.
+_STABLE_INDEXING_FAILURES = frozenset({"no_schema", "store_unavailable"})
+_TRANSIENT_ML_SKIPS = frozenset({"timeout", "scoring_error"})
+_TRANSIENT_EMBEDDING_FALLBACKS = frozenset({"provider_error", "provider_timeout"})
+
+
+def degraded_causes(events: Sequence[SessionEvent], snapshot: SessionSnapshot) -> set[str]:
+    """Transient failures visible in a finished run's own results; a later run of the same bytes may do better."""
+    causes: set[str] = set()
+    for e in events:
+        if e.type == "node" and e.state == "skipped" and e.payload.get("reason") in _TRANSIENT_ML_SKIPS:
+            causes.add(f"{e.node}:{e.payload['reason']}")
+    if snapshot.ml is not None and snapshot.ml.embedding_fallback_reason in _TRANSIENT_EMBEDDING_FALLBACKS:
+        causes.add(f"embeddings:{snapshot.ml.embedding_fallback_reason}")
+    indexing = snapshot.resurrection.indexing if snapshot.resurrection is not None else None
+    if indexing is not None and indexing.status == "failed" and indexing.reason not in _STABLE_INDEXING_FAILURES:
+        causes.add(f"indexing:{indexing.reason}")
+    return causes
 
 
 def _completed(events: Sequence[SessionEvent]) -> bool:
