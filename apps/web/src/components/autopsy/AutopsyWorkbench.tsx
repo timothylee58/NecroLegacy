@@ -38,6 +38,8 @@ function sourceNameOf(input: SessionInput): string {
 function Workbench() {
   const announce = useAnnounce();
   const client = useMemo(() => createClient(), []);
+  // The intake opens on load, so the API cold-starts while the user picks a preset instead of after the click.
+  useEffect(() => client.wake?.(), [client]);
   const [state, dispatch] = useReducer(sessionReducer, undefined, initialState);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);

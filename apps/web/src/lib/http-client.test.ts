@@ -56,17 +56,42 @@ describe("HttpClient", () => {
     await expect(new HttpClient(BASE).search("s", "q")).rejects.toMatchObject({ code: "http_error", status: 502 });
   });
 
-  it("aborts a request after 10 seconds", async () => {
-    vi.useFakeTimers();
+  const hang = () =>
     vi.spyOn(globalThis, "fetch").mockImplementation(
       (_url, init) =>
         new Promise((_resolve, reject) => {
           init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
         }),
     );
+
+  it("aborts a search after 10 seconds", async () => {
+    vi.useFakeTimers();
+    hang();
     const pending = new HttpClient(BASE).search("s", "q").catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(10_001);
     expect(await pending).toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("gives session creation 45 seconds so a cold start does not fail the first click", async () => {
+    vi.useFakeTimers();
+    hang();
+    let settled: unknown = "pending";
+    const pending = new HttpClient(BASE)
+      .createSession({ kind: "preset", preset: "ledger_1994" })
+      .catch((e: unknown) => e)
+      .then((v) => (settled = v));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(settled).toBe("pending");
+    await vi.advanceTimersByTimeAsync(15_001);
+    await pending;
+    expect(settled).toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("wake pings the health endpoint and ignores failures", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));
+    expect(() => new HttpClient(BASE).wake()).not.toThrow();
+    expect(fetchMock.mock.calls[0]![0]).toBe(`${BASE}/api/health`);
+    await Promise.resolve();
   });
 
   it("sends the search request as a JSON POST", async () => {

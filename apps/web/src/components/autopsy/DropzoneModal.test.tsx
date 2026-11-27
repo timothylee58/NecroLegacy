@@ -23,6 +23,24 @@ const sized = (name: string, size: number, type = "text/plain") => {
 };
 
 describe("DropzoneModal", () => {
+  it("says the API is waking when an upload waits past a few seconds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let resolve!: (r: CreateSessionResponse) => void;
+      const createSession = vi.fn(() => new Promise<CreateSessionResponse>((r) => (resolve = r)));
+      const client = { createSession } as unknown as AutopsyClient;
+      render(<DropzoneModal client={client} onSession={vi.fn()} open onOpenChange={vi.fn()} />);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.click(screen.getAllByRole("radio")[0]!);
+      expect(screen.getByRole("status")).toHaveTextContent("Uploading");
+      await vi.advanceTimersByTimeAsync(4_000);
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/waking the api/i));
+      resolve(RESPONSE);
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("alerts on an unsupported extension and does not upload", async () => {
     const { input, createSession } = setup();
     await userEvent.setup({ applyAccept: false }).upload(input, new File(["x"], "notes.exe"));
@@ -84,7 +102,7 @@ describe("DropzoneModal", () => {
     const { user, onSession } = setup(createSession);
     await user.click(screen.getAllByRole("radio")[0]!);
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("10 seconds");
+    expect(alert).toHaveTextContent("45 seconds");
     await user.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(onSession).toHaveBeenCalledTimes(1));
     expect(createSession).toHaveBeenCalledTimes(2);

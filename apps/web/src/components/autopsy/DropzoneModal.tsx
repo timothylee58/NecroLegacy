@@ -6,7 +6,7 @@ import { ArrowRight, BookOpen, CircleAlert, LoaderCircle, Receipt, ScrollText, t
 import { Coffin } from "./illustrations";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ApiRequestError, type AutopsyClient, type SessionInput } from "@/lib/api-client";
+import { ApiRequestError, CREATE_SESSION_TIMEOUT_MS, type AutopsyClient, type SessionInput } from "@/lib/api-client";
 import { getExtension, validateFile } from "@/lib/file-validation";
 import type { CreateSessionResponse, PresetId } from "@/types/autopsy";
 
@@ -23,7 +23,8 @@ export const PRESETS: ReadonlyArray<{ id: PresetId; label: string; Icon: LucideI
   { id: "dotmatrix_manifest", label: "Faded Dot-Matrix Manifest", Icon: ScrollText },
 ];
 
-const UPLOAD_TIMEOUT_MS = 10_000;
+// Past this, a waiting upload is most likely a cold start, so say so instead of leaving a bare "Uploading…".
+const WAKING_AFTER_MS = 4_000;
 const PAIRING_MESSAGE = "Select one data file, optionally with one .cpy copybook.";
 
 type Failure = { kind: "rejected"; message: string } | { kind: "upload"; message: string };
@@ -34,6 +35,7 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
   const lastInput = useRef<SessionInput | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
+  const [waking, setWaking] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
   const [selected, setSelected] = useState<PresetId | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -43,8 +45,9 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
       lastInput.current = input;
       setFailure(null);
       setBusy(true);
+      const wakingTimer = setTimeout(() => setWaking(true), WAKING_AFTER_MS);
       try {
-        const response = await client.createSession(input, AbortSignal.timeout(UPLOAD_TIMEOUT_MS));
+        const response = await client.createSession(input);
         onSession(response, input);
         onOpenChange(false);
       } catch (err) {
@@ -53,9 +56,11 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
           message:
             err instanceof ApiRequestError
               ? `Upload failed (${err.code}): ${err.message}`
-              : "Upload failed: the service is unreachable or did not respond within 10 seconds.",
+              : `Upload failed: the service is unreachable or did not respond within ${CREATE_SESSION_TIMEOUT_MS / 1000} seconds.`,
         });
       } finally {
+        clearTimeout(wakingTimer);
+        setWaking(false);
         setBusy(false);
       }
     },
@@ -212,7 +217,7 @@ export function DropzoneModal({ client, onSession, open, onOpenChange }: Dropzon
 
         {busy && (
           <p role="status" className="text-sm text-tallow">
-            Uploading…
+            {waking ? "Waking the API. The first autopsy after a quiet spell takes about 20 seconds." : "Uploading…"}
           </p>
         )}
         {failure && (

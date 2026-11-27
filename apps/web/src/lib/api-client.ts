@@ -40,6 +40,8 @@ export interface AutopsyClient {
   search(sessionId: string, query: string, signal?: AbortSignal): Promise<SearchResponse>;
   getAnomalies(sessionId: string, f?: AnomalyFilter): Promise<Anomaly[]>;
   presetImageUrl(id: PresetId): string;
+  /** Starts the API waking from scale-to-zero without waiting for it. */
+  wake?(): void;
 }
 
 const MOCK_STEP_MS = 400;
@@ -139,6 +141,9 @@ export class MockClient implements AutopsyClient {
 }
 
 export const REQUEST_TIMEOUT_MS = 10_000;
+// Starting a session is the first call after a quiet spell, and Cloud Run then cold-starts the API (measured 19 to
+// 22 s from instance start to ready). Every later call reaches a warm instance and keeps the 10 s limit.
+export const CREATE_SESSION_TIMEOUT_MS = 45_000;
 
 export class ApiRequestError extends Error {
   constructor(
@@ -152,12 +157,9 @@ export class ApiRequestError extends Error {
 }
 
 // setTimeout rather than AbortSignal.timeout so the deadline is controllable with fake timers.
-function withTimeout(signal?: AbortSignal): { signal: AbortSignal; clear: () => void } {
+function withTimeout(signal: AbortSignal | undefined, ms: number): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
-    REQUEST_TIMEOUT_MS,
-  );
+  const timer = setTimeout(() => controller.abort(new DOMException("Request timed out", "TimeoutError")), ms);
   return {
     signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
     clear: () => clearTimeout(timer),
@@ -183,8 +185,13 @@ export class HttpClient implements AutopsyClient {
     this.base = baseUrl.replace(/\/+$/, "");
   }
 
-  private async request(path: string, init: RequestInit, signal?: AbortSignal): Promise<Response> {
-    const timeout = withTimeout(signal);
+  private async request(
+    path: string,
+    init: RequestInit,
+    signal?: AbortSignal,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+  ): Promise<Response> {
+    const timeout = withTimeout(signal, timeoutMs);
     try {
       const res = await fetch(`${this.base}${path}`, { ...init, signal: timeout.signal });
       if (!res.ok) throw await toError(res);
@@ -205,6 +212,7 @@ export class HttpClient implements AutopsyClient {
           body: JSON.stringify({ preset_id: input.preset }),
         },
         signal,
+        CREATE_SESSION_TIMEOUT_MS,
       );
     } else {
       const form = new FormData();
@@ -214,9 +222,15 @@ export class HttpClient implements AutopsyClient {
         form.append("file", input.file, input.file.name);
         if (input.copybook) form.append("copybook", input.copybook, input.copybook.name);
       }
-      res = await this.request("/api/sessions", { method: "POST", body: form }, signal);
+      res = await this.request("/api/sessions", { method: "POST", body: form }, signal, CREATE_SESSION_TIMEOUT_MS);
     }
     return (await res.json()) as CreateSessionResponse;
+  }
+
+  wake(): void {
+    // Fire and forget: the answer does not matter, only that a request reaches Cloud Run while the user is still
+    // choosing a file, so the first real call finds a warm instance.
+    fetch(`${this.base}/api/health`, { method: "GET", cache: "no-store" }).catch(() => {});
   }
 
   subscribe(sessionId: string, handlers: SessionHandlers, lastEventId = 0): Unsubscribe {
