@@ -51,3 +51,11 @@ Real COBOL copybook edge cases (REDEFINES, packed decimals), more input formats,
 ## Built with
 
 `nextjs` `react` `typescript` `three.js` `fastapi` `python` `langgraph` `opencv` `scikit-learn` `postgresql` `pgvector` `redis` `google-cloud-run` `render` `neon` `upstash` `kiro` `mcp`
+
+## Credits
+
+Music in the demo video: *Toccata and Fugue in D minor, BWV 565* by Johann Sebastian Bach, performed by Norbert Schenk
+(organ of the Evangelische Kirche Solms-Albshausen, 2017). Licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), via
+[Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Bach,_Toccata_und_Fuge_d-moll_BWV_565,_Norbert_Schenk.mp3).
+Trimmed, faded out and lowered under the narration. Paste this into the YouTube or Vimeo description as well.

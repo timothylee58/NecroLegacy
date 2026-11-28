@@ -33,7 +33,7 @@ CREDIT_BAND = 120
 CREDIT_BOTTOM_MARGIN = 22
 CREDIT_SECONDS = 13
 # Music level: loudnorm target for the organ before ducking, and how far narration pushes it down.
-MUSIC_LUFS = -24
+MUSIC_LUFS = -22
 SCENES = ["s0", "s1", "s2", "s3", "s4", "s5a", "s5b", "s6"]
 # Playwright's video clock starts slightly after the script's, by about a tenth of a second.
 SYNC = 0.1
@@ -137,7 +137,7 @@ def audio_filters() -> list[str]:
         f"[{mus}:a]atrim=0:{total:.3f},asetpts=PTS-STARTPTS,aresample=44100,"
         f"loudnorm=I={MUSIC_LUFS}:TP=-2:LRA=11,afade=t=out:st={total - 5:.2f}:d=5[m0]"
     )
-    filters.append("[m0][nar_sc]sidechaincompress=threshold=0.02:ratio=6:attack=25:release=900:makeup=1[mducked]")
+    filters.append("[m0][nar_sc]sidechaincompress=threshold=0.02:ratio=3.5:attack=25:release=900:makeup=1[mducked]")
     filters.append("[nar][mducked]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[aout]")
     return filters
 
