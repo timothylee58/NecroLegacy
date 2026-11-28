@@ -1,107 +1,119 @@
 1
-00:00:00,100 --> 00:00:03,565
+00:00:00,100 --> 00:00:03,796
 Every enterprise has a system nobody dares to touch.
 
 2
-00:00:03,565 --> 00:00:04,830
-A mainframe ledger.
+00:00:03,796 --> 00:00:07,562
+A mainframe ledger. A warehouse batch file from 1994.
 
 3
-00:00:04,830 --> 00:00:08,095
-A warehouse batch file from 1994.
-
-4
-00:00:08,095 --> 00:00:10,027
+00:00:07,562 --> 00:00:09,623
 A scan of a printed manifest.
 
-5
-00:00:10,027 --> 00:00:13,892
+4
+00:00:09,623 --> 00:00:13,745
 The data inside is quietly rotting, and no one can see it.
 
-6
-00:00:13,892 --> 00:00:16,090
+5
+00:00:13,745 --> 00:00:16,090
 NecroLegacy performs the autopsy.
 
-7
+6
 00:00:17,796 --> 00:00:22,578
 Drop in a legacy dump, a COBOL copybook, or a photo of a printed table.
 
-8
+7
 00:00:22,578 --> 00:00:27,562
 Three synthetic presets are built in, so you can try it with no real data.
 
-9
+8
 00:00:38,987 --> 00:00:41,009
 Five agents run in a fixed order.
 
-10
+9
 00:00:41,009 --> 00:00:45,911
 The schema archaeologist infers entities, keys and relationships from raw bytes.
 
+10
+00:00:45,911 --> 00:00:50,690
+Deterministic checks and an isolation forest score the rot before any language
+
 11
-00:00:45,911 --> 00:00:51,855
-Deterministic checks and an isolation forest score the rot before any language model is involved.
+00:00:50,690 --> 00:00:55,225
+model is involved. The model only explains what the numbers already found.
 
 12
-00:00:51,855 --> 00:00:55,225
-The model only explains what the numbers already found.
-
-13
-00:01:03,555 --> 00:01:06,238
+00:01:03,555 --> 00:01:06,248
 The verdict arrives like a coroner's notice.
 
-14
-00:01:06,238 --> 00:01:09,958
+13
+00:01:06,248 --> 00:01:09,980
 Orphaned foreign keys and negative stock are always critical.
 
-15
-00:01:09,958 --> 00:01:13,983
+14
+00:01:09,980 --> 00:01:14,019
 Healthy specimens glow steadily, and the rotten ones glow crimson.
 
+15
+00:01:14,019 --> 00:01:17,140
+Drag to orbit, open any specimen for its anomalies,
+
 16
-00:01:13,983 --> 00:01:21,179
-Drag to orbit, open any specimen for its anomalies, and every interaction has a keyboard and screen reader equivalent.
+00:01:17,140 --> 00:01:21,179
+and every interaction has a keyboard and screen reader equivalent.
 
 17
-00:01:22,080 --> 00:01:26,251
+00:01:22,080 --> 00:01:26,276
 Search the records in plain words, and the broken ones surface.
 
 18
-00:01:26,251 --> 00:01:33,203
-Then the last agent resurrects the system: a typed FastAPI wrapper, syntax checked and ready to download.
+00:01:26,276 --> 00:01:30,739
+Then the last agent resurrects the system: a typed FastAPI wrapper,
 
 19
+00:01:30,739 --> 00:01:33,203
+syntax checked and ready to download.
+
+20
 00:01:34,105 --> 00:01:35,452
 It reads paper too.
 
-20
+21
 00:01:35,452 --> 00:01:40,343
 Drop in a faded dot-matrix manifest, and the first pass runs locally.
 
-21
-00:02:10,555 --> 00:02:19,869
-In the Vision X-Ray, confident regions are green, while smudged, torn or faded cells are crimson, so nothing unreadable is passed off as certain.
-
 22
-00:02:20,770 --> 00:02:23,002
-NecroLegacy was built with Kiro.
+00:02:10,555 --> 00:02:14,695
+In the Vision X-Ray, confident regions are green, while smudged,
 
 23
-00:02:23,002 --> 00:02:36,046
-A nineteen requirement spec drove the design and the task list, steering files kept every agent on the same rules, and an MCP server lets Kiro inspect a legacy schema and query its rot.
+00:02:14,695 --> 00:02:19,869
+torn or faded cells are crimson, so nothing unreadable is passed off as certain.
 
 24
-00:02:36,046 --> 00:02:39,533
-Live today on Cloud Run, Render, Neon and Upstash.
+00:02:20,770 --> 00:02:23,068
+NecroLegacy was built with Kiro.
 
 25
-00:02:39,533 --> 00:02:40,370
-NecroLegacy.
+00:02:23,068 --> 00:02:27,161
+A 19-requirement spec drove the design and the task list,
 
 26
-00:02:40,370 --> 00:02:41,556
-Autopsy the past.
+00:02:27,161 --> 00:02:30,752
+steering files kept every agent on the same rules,
 
 27
-00:02:41,556 --> 00:02:42,672
+00:02:30,752 --> 00:02:35,778
+and an MCP server lets Kiro inspect a legacy schema and query its rot.
+
+28
+00:02:35,778 --> 00:02:39,369
+Live today on Cloud Run, Render, Neon and Upstash.
+
+29
+00:02:39,369 --> 00:02:41,523
+NecroLegacy. Autopsy the past.
+
+30
+00:02:41,523 --> 00:02:42,672
 Ship the future.
