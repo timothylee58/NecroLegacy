@@ -29,6 +29,7 @@ SEARCH_LIMIT = 100
 SEARCH_MIN_SIMILARITY = 0.35
 SEARCH_TIMEOUT_SECONDS = 4.5
 POOL_CHECKOUT_SECONDS = 15.0
+POOL_MAX_IDLE_SECONDS = 240.0  # under Neon's default 5-minute suspend
 STATEMENT_TIMEOUT_MS = 4_000
 PURGE_INTERVAL_SECONDS = 3_600
 QUERY_MAX_CHARS = 500
@@ -409,6 +410,11 @@ class PgBackend:
                 open=False,
                 kwargs={"prepare_threshold": None},
                 configure=self._configure,
+                # Neon closes a suspended compute's connections without telling the pool. Testing a connection as
+                # it is borrowed swaps a dead one for a fresh one; without it the first request after a quiet spell
+                # fails with "the connection is lost". Retiring idle ones early keeps that swap rare.
+                check=AsyncConnectionPool.check_connection,
+                max_idle=POOL_MAX_IDLE_SECONDS,
             )
         self._pool = pool
         self._dsn = dsn if owns_pool else None

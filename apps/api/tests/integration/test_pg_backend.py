@@ -70,3 +70,26 @@ def test_vector_search_sql_runs_on_real_postgres():
 
     hits = asyncio.run(_with_store(body))
     assert hits and hits[0].row_number == 2
+
+
+def test_a_connection_dropped_while_pooled_is_replaced_not_handed_out():
+    # Neon suspends an idle compute and closes its connections; the pool must not hand one of them to the next request.
+    import psycopg
+
+    key = f"t-{uuid.uuid4()}"
+    provider = HashEmbeddingProvider()
+
+    async def body(store):
+        await store.index_session(key, _records("transfers"), {}, provider)
+        async with await psycopg.AsyncConnection.connect(PG_URL, autocommit=True) as admin:
+            await admin.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE pid <> pg_backend_pid() AND datname = current_database() AND application_name = ''"
+            )
+        await asyncio.sleep(0.5)
+        # Both a write and a read after the drop must succeed on a fresh connection.
+        await store.index_session(f"{key}-again", _records("transfers"), {}, provider)
+        return await store.search(key, "negative stock", provider, FIELDS)
+
+    hits = asyncio.run(_with_store(body))
+    assert [h.row_number for h in hits] == [1]
