@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FlyingBat } from "./illustrations";
 import { summarizeEntities } from "@/lib/a11y/summary";
-import type { Phase } from "@/lib/session-reducer";
+import type { NodeStatus, Phase } from "@/lib/session-reducer";
 import type { Anomaly, Entity, NodeName } from "@/types/autopsy";
 
 const STEP_TITLE: Record<NodeName, string> = {
@@ -19,6 +19,8 @@ export interface CoronersNoticeProps {
   phase: Phase;
   sourceName: string | null;
   currentNode: NodeName | null;
+  /** Critical findings come from rot_detector, so no verdict is given before it has finished. */
+  rotStatus: NodeStatus;
   entities: Entity[];
   anomalies: Anomaly[];
   servedFromCache: boolean;
@@ -30,7 +32,15 @@ interface Verdict {
   detail: string;
 }
 
-function verdictOf({ phase, sourceName, currentNode, entities, anomalies, servedFromCache }: CoronersNoticeProps): Verdict {
+function verdictOf({
+  phase,
+  sourceName,
+  currentNode,
+  rotStatus,
+  entities,
+  anomalies,
+  servedFromCache,
+}: CoronersNoticeProps): Verdict {
   if (phase === "idle") {
     return {
       key: "idle",
@@ -48,6 +58,17 @@ function verdictOf({ phase, sourceName, currentNode, entities, anomalies, served
       detail: phase === "failed" ? "The procedure stopped before any entity was recovered." : step,
     };
   }
+  const examined = { text: `${n} ${n === 1 ? "entity" : "entities"} examined.` };
+  if (rotStatus !== "completed" && rotStatus !== "skipped") {
+    // Before rot_detector reports, only ML outliers are known; "No critical rot" here would be a guess.
+    const status =
+      rotStatus === "failed" ? "Rot detection failed." : phase === "failed" ? "Autopsy halted." : "Rot detection under way.";
+    return {
+      key: `examining:${n}:${status}`,
+      lines: [examined, { text: status, tone: "dim" }],
+      detail: "",
+    };
+  }
   const worst = summarizeEntities(entities, anomalies)
     .map((s) => ({ name: s.name, critical: s.counts.critical, total: s.counts.low + s.counts.medium + s.counts.critical }))
     .sort((a, b) => b.critical - a.critical || b.total - a.total)[0];
@@ -61,7 +82,7 @@ function verdictOf({ phase, sourceName, currentNode, entities, anomalies, served
   return {
     key: `result:${n}:${critical}:${anomalies.length}`,
     lines: [
-      { text: `${n} ${n === 1 ? "entity" : "entities"} examined.` },
+      examined,
       critical > 0 ? { text: `${critical} critical.`, tone: "crimson" } : { text: "No critical rot.", tone: "dim" },
     ],
     detail,

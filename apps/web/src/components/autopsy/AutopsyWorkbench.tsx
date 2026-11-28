@@ -166,6 +166,7 @@ function Workbench() {
             phase={state.phase}
             sourceName={sourceName}
             currentNode={state.currentNode}
+            rotStatus={state.nodeStatus.rot_detector}
             entities={entities}
             anomalies={anomalies}
             servedFromCache={state.servedFromCache}
