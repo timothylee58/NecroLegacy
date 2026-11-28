@@ -868,7 +868,7 @@ All API errors use `ErrorResponse`. A FastAPI `RequestValidationError` handler c
 |---|---|---|---|---|
 | Upload read | Body > 10 MB | no | `413 file_too_large` naming the applicable limit | `info` (size only) |
 | Upload checks | Bad extension / executable / signature | no | `415 unsupported_extension` / `binary_executable` / `signature_mismatch`; no session | `info` |
-| Upload (web) | API unreachable or > 10 s | yes (retry) | `role="alert"` with Retry; no session | – |
+| Upload (web) | API unreachable or > 45 s (cold start); "waking" status after 4 s | yes (retry) | `role="alert"` with Retry; no session | – |
 | Session start | Queue full | yes | `503 busy` | `warning` |
 | Cache `get` | Unreachable, > 2 s, corrupt payload | yes | treated as a miss; pipeline runs | `warning` once per request |
 | Cache `set` | Any error | yes | session completes normally | `warning` |

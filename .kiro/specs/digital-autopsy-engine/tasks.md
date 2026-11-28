@@ -378,8 +378,8 @@ This plan builds the NecroLegacy monorepo from an empty repository in the delive
     - Use `NEXT_PUBLIC_API_URL`; surface `ErrorResponse` codes as dropzone alerts
     - _Requirements: 19.9, 1.9, 1.12, 1.13, 10.7_
   - [x] 24.2 Write unit tests for `HttpClient`
-    - Mock `fetch`: multipart body, 10 s abort, error mapping, search request shape
-    - _Requirements: 1.13, 14.3, 19.9_
+    - Mock `fetch`: multipart body, 45 s abort for session creation and 10 s for other calls, error mapping, search request shape
+    - _Requirements: 1.13, 1.14, 14.3, 19.9_
   - [x] 24.3 Add Playwright e2e against docker-compose
     - Upload, preset, keyboard-only flow, X-Ray toggle with a real image preset, SSE reconnect by killing the stream
     - _Requirements: 10.7, 10.9, 12.3, 1.10_

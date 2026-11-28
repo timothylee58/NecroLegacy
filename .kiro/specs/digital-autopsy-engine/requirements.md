@@ -67,7 +67,8 @@ The system is a monorepo: `apps/web` (Next.js 15, deployed as a Render static si
 10. WHILE the Necro_Dropzone has keyboard focus, THE Necro_Dropzone SHALL allow a user to open the file picker with the Enter or Space key and to move between Presets with the Tab and Arrow keys. The same user SHALL be able to select a Preset with the Enter or Space key, without using a pointing device.
 11. THE API_Service SHALL reject any text upload larger than 5 MB (5,242,880 bytes) and any image upload larger than 10 MB (10,485,760 bytes) with an error response stating the applicable size limit, regardless of whether the Web_App performed its own size check.
 12. WHEN the API_Service accepts a file, THE API_Service SHALL create one Analysis_Session and return its unique session ID within 2 seconds.
-13. IF the API_Service is unreachable or does not respond within 10 seconds of an upload request, THEN THE Web_App SHALL display an alert with `role="alert"` indicating the upload failed, create no Analysis_Session, and allow the user to retry.
+13. IF the API_Service is unreachable or does not respond within 45 seconds of an upload request, THEN THE Web_App SHALL display an alert with `role="alert"` indicating the upload failed, create no Analysis_Session, and allow the user to retry. The 45-second limit covers a cold start of the API_Service after it has scaled to zero (measured at 19 to 22 seconds).
+14. WHILE an upload request has been pending for more than 4 seconds without a response, THE Web_App SHALL display a message with `role="status"` stating that the API_Service is starting up.
 
 ### Requirement 2: Deterministic Legacy Parsing
 
