@@ -78,18 +78,32 @@ def test_a_connection_dropped_while_pooled_is_replaced_not_handed_out():
 
     key = f"t-{uuid.uuid4()}"
     provider = HashEmbeddingProvider()
+    # libpq reads PGAPPNAME for every connection this test's pool opens. Only backends with this exact name are
+    # terminated, so the test cannot touch other clients of the same database (a deployed API, another test run).
+    app_name = f"necro-test-{uuid.uuid4().hex[:12]}"
+    previous = os.environ.get("PGAPPNAME")
+    os.environ["PGAPPNAME"] = app_name
 
     async def body(store):
         await store.index_session(key, _records("transfers"), {}, provider)
         async with await psycopg.AsyncConnection.connect(PG_URL, autocommit=True) as admin:
-            await admin.execute(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE pid <> pg_backend_pid() AND datname = current_database() AND application_name = ''"
+            cur = await admin.execute(
+                "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity "
+                "WHERE pid <> pg_backend_pid() AND application_name = %s",
+                (app_name,),
             )
+            row = await cur.fetchone()
+            assert row is not None and row[0] >= 1, "the pool's own connection should have been found and killed"
         await asyncio.sleep(0.5)
         # Both a write and a read after the drop must succeed on a fresh connection.
         await store.index_session(f"{key}-again", _records("transfers"), {}, provider)
         return await store.search(key, "negative stock", provider, FIELDS)
 
-    hits = asyncio.run(_with_store(body))
+    try:
+        hits = asyncio.run(_with_store(body))
+    finally:
+        if previous is None:
+            os.environ.pop("PGAPPNAME", None)
+        else:
+            os.environ["PGAPPNAME"] = previous
     assert [h.row_number for h in hits] == [1]
